@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uli-worker
+  namespace: uli
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: uli-worker}}
+  template:
+    metadata: {labels: {app: uli-worker}}
+    spec:
+      containers:
+        - name: worker
+          image: uli-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom: [{configMapRef: {name: uli-config}}]
+          env: [{name: ULI_MODE, value: "distributed"}]
+          volumeMounts:
+            - {name: data, mountPath: /app/data}
+            - {name: desired-state, mountPath: /app/deployment/desired-state.yaml, subPath: desired-state.yaml}
+      volumes:
+        - {name: data, persistentVolumeClaim: {claimName: uli-data}}
+        - {name: desired-state, configMap: {name: uli-desired-state}}

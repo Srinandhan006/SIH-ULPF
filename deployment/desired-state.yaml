@@ -1,0 +1,15 @@
+# Desired-state baseline for uli.drift.resource.ResourceDriftAgent (docs/resource-drift.md).
+# Every key is optional; an absent key is never compared (no false positives out of the box).
+# Uncomment and set values that describe YOUR environment's capacity plan / expected containers.
+#
+# cpu_count: 4
+# memory_gb: 8.0
+#
+# containers:
+#   uli-api-1:
+#     image_digest: "sha256:REPLACE_WITH_KNOWN_GOOD_IMAGE_ID"
+#   uli-worker-1:
+#     image_digest: "sha256:REPLACE_WITH_KNOWN_GOOD_IMAGE_ID"
+#
+# env:
+#   ULI_MODE: distributed

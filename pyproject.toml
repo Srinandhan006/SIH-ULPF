@@ -1,0 +1,51 @@
+[project]
+name = "universal-log-intelligence"
+version = "0.1.0"
+description = "Vendor-agnostic log ingestion, parsing, normalization (OCSF 1.9) with unknown-source learning, parser-drift resilience and resource-drift detection. Air-gap first."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { file = "LICENSE" }
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy>=2.0",
+  "drain3>=0.9.11",
+  "redis>=5.0",
+  "prometheus-client>=0.20",
+  "numpy>=1.26",
+  "orjson>=3.10",
+  "pyyaml>=6.0",
+  "structlog>=24.1",
+  "python-dateutil>=2.9",
+  "regex>=2024.5",
+  "jsonschema>=4.22",
+  "cryptography>=42",
+  "psutil>=5.9",
+  "httpx>=0.27",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.5", "joblib>=1.4"]
+postgres = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "pytest-timeout>=2.3"]
+
+[project.scripts]
+uli-api = "uli.api.app:main"
+uli-worker = "uli.workers.runner:main"
+uli-ml = "uli.ml.service:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["uli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 120
+addopts = "-q"
+markers = ["performance: slow benchmarks (deselect with -m 'not performance')", "e2e: needs running stack"]

@@ -1,0 +1,43 @@
+parser_id: vendor.pfsense.filterlog
+version: 1.0.0
+vendor: Netgate
+product: pfSense
+description: >
+  pfSense packet-filter log (filterlog). Wire format: BSD syslog envelope with appname
+  "filterlog", body is a CSV whose column layout depends on ip_version (v4/v6) and action.
+  We extract the common prefix (rule/interface/action/direction/ip_version/protocol) and the
+  IPv4 TCP/UDP addressing fields, which covers the overwhelming majority of firewall-deny/pass
+  events used in the demo. https://docs.netgate.com/pfsense/en/latest/monitoring/filter-log-format.html
+compat: { envelope: uli.v1, ocsf: ">=1.6 <2" }
+pre: structural.syslog3164
+signatures:
+  - kind: syslog_app
+    equals: filterlog
+    required: true
+extract:
+  - kind: regex
+    field: message
+    pattern: '^(?P<rulenum>[^,]*),(?P<sub_rulenum>[^,]*),(?P<anchor>[^,]*),(?P<tracker>[^,]*),(?P<real_iface>[^,]*),(?P<reason>[^,]*),(?P<action>pass|block|reject),(?P<direction>in|out),(?P<ip_version>4|6),(?P<rest>.*)$'
+  - kind: regex
+    field: rest
+    optional: true
+    pattern: '^(?P<tos>[^,]*),(?P<ecn>[^,]*),(?P<ttl>[^,]*),(?P<id>[^,]*),(?P<offset>[^,]*),(?P<flags>[^,]*),(?P<proto_id>\d+),(?P<proto_text>[^,]*),(?P<length>[^,]*),(?P<src_ip>[^,]*),(?P<dst_ip>[^,]*)(?:,(?P<src_port>[^,]*),(?P<dst_port>[^,]*),(?P<data_length>[^,]*),(?P<tcp_flags>[^,]*))?'
+map:
+  class_uid: 4001
+  activity_id: 1
+  fields:
+    src_endpoint.ip: { from: src_ip }
+    src_endpoint.port: { from: src_port, type: int }
+    dst_endpoint.ip: { from: dst_ip }
+    dst_endpoint.port: { from: dst_port, type: int }
+    connection_info.protocol_name: { from: proto_text, lower: true }
+    connection_info.direction_id: { from: direction, enum: { in: 1, out: 2 }, enum_default: 0 }
+    action_id: { from: action, enum: { pass: 1, block: 2, reject: 2 } }
+    disposition_id: { from: action, enum: { pass: 1, block: 2, reject: 3 } }
+    device.name: { from: syslog.hostname }
+    firewall_rule.uid: { from: tracker }
+    firewall_rule.name: { from: rulenum }
+  unmapped: keep
+confidence:
+  base: 0.92
+  require: [src_ip, dst_ip]

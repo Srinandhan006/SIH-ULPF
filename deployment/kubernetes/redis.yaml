@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uli-redis
+  namespace: uli
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: uli-redis}}
+  template:
+    metadata: {labels: {app: uli-redis}}
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--save", "", "--appendonly", "no"]
+          ports: [{containerPort: 6379}]
+          readinessProbe: {exec: {command: ["redis-cli", "ping"]}, periodSeconds: 5}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uli-redis
+  namespace: uli
+spec:
+  selector: {app: uli-redis}
+  ports: [{port: 6379, targetPort: 6379}]

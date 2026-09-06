@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Log Intelligence — Engineering Report</title>
+<style>
+  img{max-width:100%;}
+  [hidden]{display:none!important;}
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap');
+
+  :root{
+    --bg:#eef0f4; --surface:#ffffff; --surface-2:#e6e9ee; --border:#d5d9e1;
+    --ink:#171a21; --ink-2:#454b58; --muted:#6c7686;
+    --accent:#9a5b0a; --accent-strong:#7a4708; --accent-soft:#f5e6cf;
+    --accent2:#1c7267;
+    --good:#1f7a4d; --good-soft:#e2f2e8;
+    --critical:#b3261e; --critical-soft:#fbe6e4;
+    --chart-1:#e8c48a; --chart-2:#c9822a; --chart-3:#8a5209;
+    --shadow: 0 1px 2px rgba(23,26,33,.06), 0 8px 24px -12px rgba(23,26,33,.12);
+    color-scheme: light;
+    --font-display:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+    --font-body:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+    --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10141c; --surface:#161b26; --surface-2:#1e2531; --border:#2b3242;
+      --ink:#e9ebf0; --ink-2:#c2c7d1; --muted:#8f97a6;
+      --accent:#e0a030; --accent-strong:#f0b34a; --accent-soft:#2c2312;
+      --accent2:#52c2b1;
+      --good:#4cb27d; --good-soft:#173327;
+      --critical:#e5675f; --critical-soft:#33201e;
+      --chart-1:#5c4726; --chart-2:#b9812f; --chart-3:#e5ac4d;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10141c; --surface:#161b26; --surface-2:#1e2531; --border:#2b3242;
+    --ink:#e9ebf0; --ink-2:#c2c7d1; --muted:#8f97a6;
+    --accent:#e0a030; --accent-strong:#f0b34a; --accent-soft:#2c2312;
+    --accent2:#52c2b1;
+    --good:#4cb27d; --good-soft:#173327;
+    --critical:#e5675f; --critical-soft:#33201e;
+    --chart-1:#5c4726; --chart-2:#b9812f; --chart-3:#e5ac4d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 28px -12px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box;}
+  body{ background:var(--bg); color:var(--ink); font-family:var(--font-body); line-height:1.6; }
+  h1,h2,h3,h4{ font-family:var(--font-display); color:var(--ink); text-wrap:balance; margin:0; }
+  p{ margin:0 0 1em; max-width:66ch; }
+  a{ color:var(--accent-strong); text-decoration-thickness:1px; text-underline-offset:2px; }
+  code, .mono{ font-family:var(--font-mono); }
+  code{ background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:.1em .4em; font-size:.88em; }
+  table{ border-collapse:collapse; width:100%; font-size:.94rem; }
+  th,td{ text-align:left; padding:.55em .75em; border-bottom:1px solid var(--border); vertical-align:top; }
+  th{ font-family:var(--font-display); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:var(--surface-2); }
+  tbody tr:hover{ background:var(--surface-2); }
+  .num{ font-variant-numeric:tabular-nums; font-family:var(--font-mono); }
+  .scroll-x{ overflow-x:auto; border:1px solid var(--border); border-radius:8px; }
+  .scroll-x table{ min-width:640px; }
+
+  .layout{ display:grid; grid-template-columns: 250px minmax(0,1fr); gap:0; max-width:1240px; margin:0 auto; }
+  @media (max-width:920px){ .layout{ grid-template-columns:1fr; } .side{ position:static !important; height:auto !important; border-right:none !important; border-bottom:1px solid var(--border); } }
+
+  .side{ position:sticky; top:0; height:100vh; overflow-y:auto; padding:28px 18px 40px; border-right:1px solid var(--border); background:var(--surface); }
+  .side .brand{ font-family:var(--font-display); font-weight:700; font-size:1rem; margin-bottom:2px; }
+  .side .brand-sub{ font-family:var(--font-mono); font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:22px; display:block; }
+  .side nav{ display:flex; flex-direction:column; gap:2px; }
+  .side .grp{ font-family:var(--font-mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:16px 0 4px; }
+  .side a{ color:var(--ink-2); text-decoration:none; font-size:.86rem; padding:5px 8px; border-radius:5px; border-left:2px solid transparent; }
+  .side a:hover{ background:var(--surface-2); color:var(--ink); }
+
+  main{ padding:44px clamp(20px,5vw,64px) 100px; min-width:0; }
+  .content{ max-width:840px; }
+
+  header.hero{ margin-bottom:44px; padding-bottom:28px; border-bottom:1px solid var(--border); }
+  header.hero h1{ font-size:clamp(1.9rem,4vw,2.5rem); font-weight:700; }
+  header.hero .tag{ font-family:var(--font-body); font-style:italic; color:var(--ink-2); font-size:1.05rem; margin-top:8px; max-width:60ch; }
+  .badges{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .badge{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:.74rem; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink-2); }
+  .badge .dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .dot-good{ background:var(--good); } .dot-accent{ background:var(--accent); } .dot-muted{ background:var(--muted); }
+
+  section{ margin-bottom:64px; scroll-margin-top:20px; }
+  .eyebrow{ font-family:var(--font-mono); font-size:.72rem; text-transform:uppercase; letter-spacing:.09em; color:var(--accent-strong); margin-bottom:8px; }
+  section h2{ font-size:1.5rem; margin-bottom:6px; }
+  section h3{ font-size:1.08rem; margin:28px 0 10px; }
+  .lede{ color:var(--ink-2); font-size:1.02rem; margin-top:10px; margin-bottom:24px; }
+
+  figure{ margin:22px 0; padding:18px 18px 12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); }
+  figure svg{ max-width:100%; height:auto; display:block; }
+  figcaption{ font-size:.84rem; color:var(--muted); margin-top:10px; border-top:1px solid var(--border); padding-top:10px; }
+
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px 20px; margin:18px 0; }
+  .panel.soft{ background:var(--accent-soft); border-color:transparent; }
+  .panel.crit{ background:var(--critical-soft); border-color:transparent; }
+  .panel.good{ background:var(--good-soft); border-color:transparent; }
+  .panel h4{ font-size:.9rem; margin-bottom:6px; }
+  .panel p:last-child{ margin-bottom:0; }
+
+  pre{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:14px 16px; overflow-x:auto; font-family:var(--font-mono); font-size:.82rem; line-height:1.55; margin:14px 0; }
+  pre code{ background:none; border:none; padding:0; }
+  .cmd::before{ content:"$ "; color:var(--muted); }
+
+  .status{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:.78rem; font-weight:500; padding:2px 9px; border-radius:5px; }
+  .status-met{ background:var(--good-soft); color:var(--good); }
+  .status-gap{ background:var(--accent-soft); color:var(--accent-strong); }
+  .status-no{ background:var(--critical-soft); color:var(--critical); }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+  .stat{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 18px; }
+  .stat .v{ font-family:var(--font-mono); font-size:1.6rem; font-weight:600; color:var(--ink); }
+  .stat .l{ font-size:.8rem; color:var(--muted); margin-top:2px; }
+
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-2); margin-top:10px; }
+  .legend .sw{ width:10px; height:10px; display:inline-block; border-radius:2px; margin-right:5px; vertical-align:middle; }
+
+  .footer{ margin-top:70px; padding-top:24px; border-top:1px solid var(--border); font-size:.82rem; color:var(--muted); }
+  ::selection{ background:var(--accent-soft); }
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <aside class="side">
+    <div class="brand">Universal Log Intelligence</div>
+    <span class="brand-sub">Engineering walkthrough · SIH build</span>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#is-it-scalable">Is it scalable?</a>
+      <div class="grp">Architecture</div>
+      <a href="#how-it-works">How it works</a>
+      <a href="#ladder">The 7-tier ladder</a>
+      <a href="#unknown">Unknown-vendor learning</a>
+      <a href="#drift">Parser-drift resilience</a>
+      <a href="#resource-drift">Resource / config drift</a>
+      <a href="#provenance">Raw provenance</a>
+      <a href="#ml">Optional ML sidecar</a>
+      <div class="grp">Scalability</div>
+      <a href="#measured">Measured performance</a>
+      <a href="#bottleneck">Where the time goes</a>
+      <a href="#horizontal">Horizontal scaling</a>
+      <a href="#deploy-topologies">Deployment topologies</a>
+      <div class="grp">Prove it</div>
+      <a href="#demonstrate">How to demonstrate it</a>
+      <a href="#testing">Testing evidence</a>
+      <div class="grp">Operate it</div>
+      <a href="#security">Security posture</a>
+      <a href="#airgap">Air-gapped operation</a>
+      <div class="grp">Honesty</div>
+      <a href="#pending">What's still pending</a>
+      <a href="#novelty">Novelty, scoped honestly</a>
+      <a href="#map">Repository map</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="content">
+
+      <header class="hero" id="overview">
+        <h1>Universal Log Intelligence</h1>
+        <p class="tag">A vendor-agnostic log pipeline that maps any log format onto OCSF 1.9 — and keeps producing a traceable event even for a vendor it has never seen before.</p>
+        <div class="badges">
+          <span class="badge"><span class="dot dot-good"></span>92 / 92 tests passing</span>
+          <span class="badge"><span class="dot dot-good"></span>4 / 4 containers healthy</span>
+          <span class="badge"><span class="dot dot-accent"></span>2 real bugs found &amp; fixed by live testing</span>
+          <span class="badge"><span class="dot dot-muted"></span>12 real datasets, 0 synthetic fixtures</span>
+          <span class="badge"><span class="dot dot-muted"></span>report generated 2026-09-06</span>
+        </div>
+      </header>
+
+      <section>
+        <div class="eyebrow">The problem</div>
+        <h2>Every log pipeline works — until it meets a format it hasn't seen</h2>
+        <p class="lede">Production pipelines normalize a log only after a human has written a parser for that exact format. A new vendor, a new firmware version, or a silently changed log line either gets dropped, gets stored as useless raw text, or — worse — keeps being parsed by a stale rule and produces confidently wrong data. Universal Log Intelligence (ULI) is built around one non-negotiable rule instead: <strong>a line that fails every deterministic tier still produces a usable, traceable event</strong> — never an exception, never a silent drop.</p>
+        <p>This page walks through how that actually works in the code that exists today (not a design doc — every claim below points at a file, a test, or a number that was measured on this machine), how to demonstrate it yourself in under five minutes, and — since that was asked directly — an honest answer on scalability and on what is still left to do.</p>
+      </section>
+
+      <section id="is-it-scalable">
+        <div class="eyebrow">The direct answer</div>
+        <h2>Is it scalable?</h2>
+        <p class="lede">Yes, horizontally — and the single-process ceiling is measured and published, not hidden.</p>
+        <div class="grid2">
+          <div class="panel">
+            <h4>What was measured</h4>
+            <p>One unbatched Python process sustains <strong>177–216 events/sec</strong> with sub-11&nbsp;ms p99 latency up to 100,000 events, using flat memory. This is the <em>floor</em>, not the ceiling — see <a href="#measured">measured performance</a>.</p>
+          </div>
+          <div class="panel">
+            <h4>What was built and run</h4>
+            <p>A distributed topology — 2 worker containers pulling from one Redis Streams queue behind a shared API — was actually built, started, and verified functionally correct in this session, not just diagrammed. See <a href="#horizontal">horizontal scaling</a>.</p>
+          </div>
+        </div>
+        <p>The honest caveat: the per-worker number is CPU-bound on SQL statement overhead (profiled, not guessed — <a href="#bottleneck">§ where the time goes</a>), and a quantified "events/sec vs. worker count" curve was not benchmarked in this build. The scaling <em>mechanism</em> is demonstrated; its <em>throughput curve</em> is not yet measured. That gap is stated plainly rather than papered over with a projected number.</p>
+      </section>
+
+      <section id="how-it-works">
+        <div class="eyebrow">Architecture</div>
+        <h2>How it works, end to end</h2>
+        <p class="lede">One line enters as bytes; it leaves as an OCSF-shaped event that always points back at the exact bytes it came from.</p>
+
+        <figure role="img" aria-label="A log line flows from a collector through the API into a queue, is picked up by a worker that runs it through the seven-tier parsing ladder and normalizer, and lands in storage; the API also writes the raw bytes to a content-addressed raw store, and every stored event carries a raw_event_id pointer back to it.">
+          <svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+            <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+              <!-- main row boxes -->
+              <g>
+                <rect x="20" y="40" width="130" height="56" rx="6" fill="none" stroke="currentColor"/>
+                <text x="85" y="63" text-anchor="middle">Collector</text>
+                <text x="85" y="80" text-anchor="middle" fill="var(--muted)" font-size="10.5">Go, syslog/file</text>
+              </g>
+              <g>
+                <rect x="200" y="40" width="130" height="56" rx="6" fill="none" stroke="currentColor"/>
+                <text x="265" y="63" text-anchor="middle">API</text>
+                <text x="265" y="80" text-anchor="middle" fill="var(--muted)" font-size="10.5">POST /v1/ingest</text>
+              </g>
+              <g>
+                <rect x="380" y="40" width="130" height="56" rx="6" fill="none" stroke="currentColor"/>
+                <text x="445" y="63" text-anchor="middle">Queue</text>
+                <text x="445" y="80" text-anchor="middle" fill="var(--muted)" font-size="10.5">Redis Streams</text>
+              </g>
+              <g>
+                <rect x="560" y="30" width="150" height="76" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+                <text x="635" y="53" text-anchor="middle" fill="var(--accent-strong)" font-weight="600">Worker</text>
+                <text x="635" y="70" text-anchor="middle" fill="var(--muted)" font-size="10.5">7-tier ladder</text>
+                <text x="635" y="84" text-anchor="middle" fill="var(--muted)" font-size="10.5">+ OCSF normalize</text>
+              </g>
+              <g>
+                <rect x="770" y="40" width="112" height="56" rx="6" fill="none" stroke="currentColor"/>
+                <text x="826" y="63" text-anchor="middle">Storage</text>
+                <text x="826" y="80" text-anchor="middle" fill="var(--muted)" font-size="10.5">SQLite / Postgres</text>
+              </g>
+
+              <!-- raw store branch -->
+              <g>
+                <rect x="200" y="200" width="130" height="56" rx="6" fill="none" stroke="currentColor" stroke-dasharray="0"/>
+                <text x="265" y="223" text-anchor="middle">Raw store</text>
+                <text x="265" y="240" text-anchor="middle" fill="var(--muted)" font-size="10.5">content-addressed</text>
+              </g>
+
+              <!-- arrows main row -->
+              <line x1="150" y1="68" x2="196" y2="68" stroke="currentColor" marker-end="url(#arrow)"/>
+              <text x="173" y="58" text-anchor="middle" font-size="10">bytes</text>
+
+              <line x1="330" y1="68" x2="376" y2="68" stroke="currentColor" marker-end="url(#arrow)"/>
+              <text x="353" y="58" text-anchor="middle" font-size="10">publish</text>
+
+              <line x1="510" y1="68" x2="556" y2="68" stroke="currentColor" marker-end="url(#arrow)"/>
+              <text x="533" y="58" text-anchor="middle" font-size="10">consume</text>
+
+              <line x1="710" y1="68" x2="766" y2="68" stroke="currentColor" marker-end="url(#arrow)"/>
+              <text x="738" y="58" text-anchor="middle" font-size="10">event</text>
+
+              <!-- api to raw store -->
+              <line x1="265" y1="96" x2="265" y2="196" stroke="currentColor" marker-end="url(#arrow)"/>
+              <text x="278" y="150" font-size="10">sha256(bytes)</text>
+
+              <!-- provenance dashed back-reference -->
+              <path d="M 826 96 C 826 250, 400 250, 336 228" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+              <text x="560" y="272" text-anchor="middle" fill="var(--accent-strong)" font-size="10.5">every stored event carries raw_event_id →</text>
+            </g>
+          </svg>
+          <figcaption><strong>Fig. 1 — the ingest path.</strong> The queue hop is skipped in <code>ULI_MODE=local</code> (single-container demo, worker runs in-process); it is real Redis Streams in <code>ULI_MODE=distributed</code>, which is what <code>docker-compose.yml</code> runs. The raw store write happens before parsing is even attempted, so a crash mid-parse never loses the original bytes.</figcaption>
+        </figure>
+
+        <p>Every component here is something this build actually starts and talks to: <code>uli/api/app.py</code> (FastAPI), Redis Streams, <code>uli/workers/runner.py</code>, <code>uli/engine.py</code> + <code>uli/pipeline.py</code> (the ladder), and <code>uli/storage/sql.py</code> (SQLAlchemy Core over SQLite or PostgreSQL). The Go collector (<code>collector/cmd/uli-collector</code>) is a dumb, static-binary forwarder — it does no parsing, so it can sit at the network edge with a minimal attack surface (17.9&nbsp;MB distroless image, see <a href="#deploy-topologies">deployment topologies</a>).</p>
+      </section>
+
+      <section id="ladder">
+        <div class="eyebrow">The core mechanism</div>
+        <h2>The 7-tier parsing ladder</h2>
+        <p class="lede">Every tier is a <em>total function</em> — it returns a result, it never raises. If a tier can't parse a line with confidence, it says so and the next tier gets a turn. Nothing ever reaches "no event was produced."</p>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>Tier</th><th>Strategy</th><th>Confidence</th><th>What it actually does</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Structural</td><td class="num">0.6 – 0.8</td><td>Recognizes JSON, CEF, LEEF, syslog 5424/3164, logfmt/KV, Common Log Format, log4j — formats with a fixed grammar, no vendor knowledge needed.</td></tr>
+              <tr><td class="num">2</td><td>Declarative vendor pack</td><td class="num">0.85 – 1.0</td><td>A YAML file in <code>parsers/vendors/</code> with a signature + regex/grok field extraction. Hot-loaded — no rebuild, no restart.</td></tr>
+              <tr><td class="num">3</td><td>Field / type inference</td><td class="num">+0.05 – 0.15</td><td>Always runs to enrich tiers 1 and 4 with typed field guesses (IP, port, timestamp, integer…).</td></tr>
+              <tr><td class="num">4</td><td>Drain3 template mining</td><td class="num">0.4 – 0.6</td><td>Online clustering into a wildcarded template (e.g. <code>id &lt;NUM&gt; state RUNNING</code>) when no declarative pack matches.</td></tr>
+              <tr><td class="num">5</td><td>Shape similarity</td><td class="num">0.3 – 0.7</td><td>Compares the line's structural fingerprint against known shapes even when the exact template hasn't been mined yet.</td></tr>
+              <tr><td class="num">6</td><td>ML sidecar <em>(optional)</em></td><td>additive</td><td>Isolation-Forest anomaly score + nearest-centroid vendor guess. Annotation only — see <a href="#ml">§ ML sidecar</a>.</td></tr>
+              <tr><td class="num">7</td><td>Quarantine</td><td class="num">≤ 0.3</td><td>The floor. Raw bytes, fingerprint, and best-effort template are preserved — nothing is thrown away.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A line only falls into the unknown-vendor registry (next section) when it lands at tier ≥4 <em>and</em> confidence stays below <code>tau_known</code> (0.6 by default) — a threshold, not a guess: it was the exact bug found and fixed in this build (the gate originally only fired at tier ≥6, silently skipping Drain3-tier unknowns; corrected against the project's own architecture spec, regression-tested in <code>tests/integration/test_unknown_and_evolution.py</code>).</p>
+      </section>
+
+      <section id="unknown">
+        <div class="eyebrow">Self-improving, human-approved</div>
+        <h2>Unknown-vendor learning loop</h2>
+        <p class="lede">A format nobody configured doesn't just get quarantined forever — it gets clustered, and after enough examples, ULI drafts a parser for it.</p>
+
+        <figure role="img" aria-label="An unrecognized line is fingerprinted by its family hash, accumulates into a cluster with other lines sharing that hash, and once the cluster reaches twenty events a draft YAML parser is synthesized; a human reviews and promotes it, after which it becomes an active tier-2 parser that catches future lines of the same vendor before they ever reach the unknown path again.">
+          <svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+              </marker>
+            </defs>
+            <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+              <g><rect x="10" y="60" width="140" height="56" rx="6" fill="none" stroke="currentColor"/><text x="80" y="83" text-anchor="middle">Unknown line</text><text x="80" y="100" text-anchor="middle" fill="var(--muted)" font-size="10">tier ≥4, low confidence</text></g>
+              <g><rect x="200" y="60" width="140" height="56" rx="6" fill="none" stroke="currentColor"/><text x="270" y="83" text-anchor="middle">Fingerprint</text><text x="270" y="100" text-anchor="middle" fill="var(--muted)" font-size="10">family_hash</text></g>
+              <g><rect x="390" y="60" width="140" height="56" rx="6" fill="none" stroke="currentColor"/><text x="460" y="83" text-anchor="middle">Cluster</text><text x="460" y="100" text-anchor="middle" fill="var(--muted)" font-size="10">accumulate ≥20</text></g>
+              <g><rect x="580" y="60" width="140" height="56" rx="6" fill="none" stroke="currentColor"/><text x="650" y="83" text-anchor="middle">Suggest</text><text x="650" y="100" text-anchor="middle" fill="var(--muted)" font-size="10">synth draft YAML</text></g>
+              <g><rect x="770" y="60" width="120" height="56" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.6"/><text x="830" y="83" text-anchor="middle" fill="var(--accent-strong)" font-weight="600">Promote</text><text x="830" y="100" text-anchor="middle" fill="var(--muted)" font-size="10">human-approved</text></g>
+
+              <line x1="150" y1="88" x2="196" y2="88" stroke="currentColor" marker-end="url(#arrow2)"/>
+              <line x1="340" y1="88" x2="386" y2="88" stroke="currentColor" marker-end="url(#arrow2)"/>
+              <line x1="530" y1="88" x2="576" y2="88" stroke="currentColor" marker-end="url(#arrow2)"/>
+              <line x1="720" y1="88" x2="766" y2="88" stroke="currentColor" marker-end="url(#arrow2)"/>
+
+              <path d="M 830 116 C 830 175, 270 175, 270 120" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arrow2)"/>
+              <text x="550" y="192" text-anchor="middle" fill="var(--accent-strong)" font-size="10.5">becomes an active tier-2 pack → next line of this vendor never reaches "unknown" again</text>
+            </g>
+          </svg>
+          <figcaption><strong>Fig. 2 — real, observed output</strong> from a live run of <code>scripts/demo.py</code> in this session, source <code>GIZMOTECH-UNIT</code> (never configured anywhere in the repo): cluster reached <code>event_count: 20</code>, mined template <code>"GIZMOTECH-UNIT id &lt;NUM&gt; state RUNNING zone north load &lt;NUM&gt; at &lt;TS&gt;"</code>, and promotion produced parser id <code>suggested.demo-unknown-4b2d0c2a.01m1tg3g</code>, immediately visible at <code>GET /v1/parsers</code>.</figcaption>
+        </figure>
+
+        <p>The suggestion step reuses the <em>same</em> template-alignment machinery as parser-drift evolution (<a href="#drift">next section</a>) rather than a second implementation — for a fresh vendor there's simply no v1 pack to align against, so the alignment runs against nothing and the draft comes straight from inferred field types. Promotion is never automatic: a suggestion sits at <code>GET /v1/parsers/suggestions</code> until a human calls <code>POST /v1/parsers/suggestions/{id}/promote</code> with <code>approved_by</code> recorded for audit — an auto-promoted parser trained on 20 lines from one cluster could start misrouting superficially similar traffic, so the loop deliberately keeps a person in it.</p>
+      </section>
+
+      <section id="drift">
+        <div class="eyebrow">Resilience, not brittleness</div>
+        <h2>Parser-drift resilience</h2>
+        <p class="lede">A vendor doesn't announce when it changes its log format. ULI is built to keep every event flowing through the change, and to notice the change happened.</p>
+        <div class="panel">
+          <h4>A real example, run against the live stack in this session</h4>
+          <pre><code>v1 (known format):  Jun 14 15:16:01 host1 myapp[555]: connection accepted from 10.0.0.5
+v2 (drifted format): Jun 14 15:17:02 host1 myapp(555): INFO connection accepted from 10.0.0.6</code></pre>
+          <p>The bracket became parentheses and a severity token was inserted. Both lines produced a usable, tiered event — <code>tests/e2e/test_deployed_stack.py::test_format_drift_does_not_break_ingestion</code> and <code>scripts/demo.py</code> scenario 2 both assert this against the real deployed container, not a mock.</p>
+        </div>
+        <p>Detection works statistically, not by string diffing: per <code>(source_id, parser_id)</code>, ULI keeps a rolling window (default 500 events / 60s) of the structural-shape histogram and mean confidence, and compares it to a frozen reference window via Jensen–Shannon divergence. Sustained divergence — not a rare one-off — degrades that parser's health to <code>degraded</code>, hands more routing weight to tiers 4–5, and triggers the same evolution machinery described above: Drain3 re-mines the drifted traffic, and Needleman–Wunsch sequence alignment tries to transfer the old parser's field labels onto the new template's token positions, producing a v2 draft pack that runs in shadow mode until a human promotes it.</p>
+      </section>
+
+      <section id="resource-drift">
+        <div class="eyebrow">Infrastructure, not just logs</div>
+        <h2>Resource / configuration drift</h2>
+        <p class="lede">A second, independent drift signal: is the deployment itself still what was declared, not just the log format.</p>
+        <p><code>uli/drift/resource.py</code> compares <code>deployment/desired-state.yaml</code> against observed CPU/memory (<code>psutil</code>) and — when the Docker socket is mounted — container image digests via the Docker Engine API. The shipped template ships with every key commented out, so a fresh deployment produces <strong>zero drift events by default</strong>; an operator opts in by uncommenting the values that describe their own capacity plan. The observed snapshot is itself content-hashed and written through the same raw store and provenance envelope as ingested logs, so a resource-drift event is forensically traceable to the exact system state that produced it.</p>
+        <div class="panel soft">
+          <h4>A deliberate, stated tradeoff</h4>
+          <p>The Docker socket is <strong>not</strong> mounted into the <code>api</code>/<code>worker</code> containers in this deployment — giving a container the host socket is close to giving it root on the host, and that wasn't judged worth it for this build. <code>_docker_state()</code> degrades to <code>{}</code> gracefully when the socket is absent (no crash, no false positives) — an operator who wants container-digest drift can mount it explicitly and accept the tradeoff.</p>
+        </div>
+      </section>
+
+      <section id="provenance">
+        <div class="eyebrow">Nothing is ever thrown away</div>
+        <h2>Raw provenance and forensic replay</h2>
+        <p class="lede">Every normalized event carries a pointer back to the exact original bytes it was built from — byte-for-byte, hash-verified.</p>
+        <p>The raw store is content-addressed and append-only. Every event in the normalized store carries <code>raw_event_id</code>, <code>raw_segment</code>/<code>offset</code>, and the exact <code>parser_id</code>/<code>version</code>/<code>tier</code>/<code>confidence</code> that produced it. This was verified with a real request against the live stack in this session:</p>
+        <pre><code>GET /v1/raw/df6c94fbad998c152aec9f8ecb6d71278f58ed87e86bac10573f756d6ad2bb11
+→ { "sha256_verified": true, "payload": "raw provenance round trip through the demo script", "parser_id": "engine.drain3", "tier": 4 }</code></pre>
+        <p>This exact endpoint is where a real production bug was found and fixed during this build (see <a href="#testing">testing evidence</a>) — worth naming here because it's the clearest proof that "provenance" isn't just a schema field, it's something that was actually exercised end to end over real HTTP until it broke, then fixed, then locked down with a regression test.</p>
+      </section>
+
+      <section id="ml">
+        <div class="eyebrow">Optional, bounded, never load-bearing</div>
+        <h2>The ML sidecar — and why it's tier 6, not tier 1</h2>
+        <p class="lede">ULI does not need machine learning to satisfy its core requirement. ML is confined to an optional, fail-open annotation role, only for lines four non-ML strategies already couldn't confidently parse.</p>
+        <p>Two small, CPU-only, no-pretrained-weights models — an Isolation Forest for per-source anomaly scoring and a nearest-centroid vendor classifier, both training online from local traffic only — run in a <em>separate</em> container (<code>uli-ml</code>) so the primary ingestion path never pays for scikit-learn/numpy unless ML is explicitly enabled (<code>ULI_ML_ENABLED=false</code> by default). Every call is wrapped so a slow or dead sidecar degrades to "tier 6 produces nothing extra," never a stall or an error.</p>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>Image</th><th>Size</th><th>Build time</th></tr></thead>
+            <tbody>
+              <tr><td><code>uli-api</code></td><td class="num">441 MB</td><td class="num">~112 s</td></tr>
+              <tr><td><code>uli-worker</code></td><td class="num">422 MB</td><td class="num">~29 s (cached)</td></tr>
+              <tr><td><code>uli-ml</code></td><td class="num">687 MB</td><td class="num">~146 s</td></tr>
+              <tr><td><code>uli-collector</code> (Go, distroless)</td><td class="num">17.9 MB</td><td class="num">~58 s</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The ML image is 56% larger than the base API image for a feature that only ever fires on already-unidentified traffic — that measured number is the actual justification for making <code>ml</code> a Docker Compose <em>profile</em> rather than part of the default stack.</p>
+      </section>
+
+      <section id="measured">
+        <div class="eyebrow">Real numbers, not projections</div>
+        <h2>Measured performance</h2>
+        <p class="lede">Single process, SQLite, no batching, no multiprocessing — the deliberate floor configuration, measured at three scales on this machine (10 logical CPUs, Python 3.12).</p>
+
+        <figure role="img" aria-label="Bar chart of events processed per second at three load sizes: 216 at 1,000 events, 210 at 10,000 events, and 177 at 100,000 events, showing throughput degrading as load grows.">
+          <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+            <g font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor">
+              <line x1="60" y1="20" x2="60" y2="270" stroke="var(--border)"/>
+              <g stroke="var(--border)">
+                <line x1="60" y1="270" x2="580" y2="270"/>
+                <line x1="60" y1="207.5" x2="580" y2="207.5"/>
+                <line x1="60" y1="145" x2="580" y2="145"/>
+                <line x1="60" y1="82.5" x2="580" y2="82.5"/>
+                <line x1="60" y1="20" x2="580" y2="20"/>
+              </g>
+              <g fill="var(--muted)" text-anchor="end">
+                <text x="52" y="274">0</text><text x="52" y="211.5">60</text><text x="52" y="149">120</text><text x="52" y="86.5">180</text><text x="52" y="24">240</text>
+              </g>
+              <text x="20" y="14" fill="var(--muted)" font-size="10.5">events / sec</text>
+
+              <rect x="108.33" y="45.0" width="90" height="225" rx="3" fill="var(--chart-2)"/>
+              <text x="153.33" y="35" text-anchor="middle" font-weight="600">216.0</text>
+              <rect x="295" y="51.25" width="90" height="218.75" rx="3" fill="var(--chart-2)"/>
+              <text x="340" y="41.25" text-anchor="middle" font-weight="600">209.9</text>
+              <rect x="481.67" y="85.94" width="90" height="184.06" rx="3" fill="var(--chart-2)"/>
+              <text x="526.67" y="75.94" text-anchor="middle" font-weight="600">176.7</text>
+
+              <g fill="var(--ink-2)" text-anchor="middle">
+                <text x="153.33" y="292">1,000</text>
+                <text x="340" y="292">10,000</text>
+                <text x="526.67" y="292">100,000</text>
+              </g>
+              <text x="320" y="312" text-anchor="middle" fill="var(--muted)" font-size="10.5">events ingested per test run</text>
+            </g>
+          </svg>
+          <figcaption><strong>Fig. 3 — throughput vs. load.</strong> Source: <code>tests/performance/last_run_results.json</code>, copied verbatim (never hand-edited — the project's own non-fabrication rule for this file).</figcaption>
+        </figure>
+
+        <figure role="img" aria-label="Grouped bar chart of p50, p95, and p99 latency in milliseconds at three load sizes, showing all three percentiles rising as load grows, most sharply at p99 which reaches 10.8 milliseconds at 100,000 events.">
+          <svg viewBox="0 0 640 340" xmlns="http://www.w3.org/2000/svg">
+            <g font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor">
+              <line x1="60" y1="40" x2="60" y2="290" stroke="var(--border)"/>
+              <g stroke="var(--border)">
+                <line x1="60" y1="290" x2="580" y2="290"/>
+                <line x1="60" y1="227.5" x2="580" y2="227.5"/>
+                <line x1="60" y1="165" x2="580" y2="165"/>
+                <line x1="60" y1="102.5" x2="580" y2="102.5"/>
+                <line x1="60" y1="40" x2="580" y2="40"/>
+              </g>
+              <g fill="var(--muted)" text-anchor="end">
+                <text x="52" y="294">0</text><text x="52" y="231.5">3</text><text x="52" y="169">6</text><text x="52" y="106.5">9</text><text x="52" y="44">12</text>
+              </g>
+              <text x="20" y="20" fill="var(--muted)" font-size="10.5">latency, ms</text>
+
+              <!-- 1K -->
+              <rect x="102.33" y="199.83" width="30" height="90.17" fill="var(--chart-1)"/>
+              <rect x="138.33" y="173.76" width="30" height="116.24" fill="var(--chart-2)"/>
+              <rect x="174.33" y="157.03" width="30" height="132.97" fill="var(--chart-3)"/>
+              <!-- 10K -->
+              <rect x="289" y="197.2" width="30" height="92.8" fill="var(--chart-1)"/>
+              <rect x="325" y="169.33" width="30" height="120.67" fill="var(--chart-2)"/>
+              <rect x="361" y="151.86" width="30" height="138.14" fill="var(--chart-3)"/>
+              <!-- 100K -->
+              <rect x="475.67" y="179.47" width="30" height="110.53" fill="var(--chart-1)"/>
+              <rect x="511.67" y="116.05" width="30" height="173.95" fill="var(--chart-2)"/>
+              <rect x="547.67" y="64.61" width="30" height="225.39" fill="var(--chart-3)"/>
+              <text x="562.67" y="60" text-anchor="middle" font-weight="600" font-size="10.5">10.8</text>
+
+              <g fill="var(--ink-2)" text-anchor="middle">
+                <text x="153.33" y="312">1,000</text>
+                <text x="340" y="312">10,000</text>
+                <text x="526.67" y="312">100,000</text>
+              </g>
+            </g>
+          </svg>
+          <figcaption>
+            <strong>Fig. 4 — latency percentiles vs. load.</strong>
+            <div class="legend">
+              <span><span class="sw" style="background:var(--chart-1)"></span>p50</span>
+              <span><span class="sw" style="background:var(--chart-2)"></span>p95</span>
+              <span><span class="sw" style="background:var(--chart-3)"></span>p99</span>
+            </div>
+          </figcaption>
+        </figure>
+
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>n</th><th>events/sec</th><th>p50 ms</th><th>p95 ms</th><th>p99 ms</th><th>max ms</th><th>wall s</th><th>CPU user s</th><th>RSS Δ MB</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1,000</td><td class="num">216.0</td><td class="num">4.33</td><td class="num">5.58</td><td class="num">6.38</td><td class="num">15.84</td><td class="num">4.63</td><td class="num">4.49</td><td class="num">3.6</td></tr>
+              <tr><td class="num">10,000</td><td class="num">209.9</td><td class="num">4.45</td><td class="num">5.79</td><td class="num">6.63</td><td class="num">17.08</td><td class="num">47.64</td><td class="num">46.37</td><td class="num">1.1</td></tr>
+              <tr><td class="num">100,000</td><td class="num">176.7</td><td class="num">5.31</td><td class="num">8.35</td><td class="num">10.82</td><td class="num">37.42</td><td class="num">565.85</td><td class="num">547.72</td><td class="num">8.4</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Read honestly: throughput <em>degrades</em> as n grows and every percentile <em>grows</em> with it. Memory stays flat (single-digit MB delta even at 100K — no leak) and CPU-user time tracks wall time almost 1:1 at every scale — this workload is CPU-bound, not disk/fsync-bound. 1M and 10M runs were <strong>not</strong> executed: at this rate they would take roughly 94 minutes and 16 hours respectively in this exact unbatched configuration, and projecting a number for them and presenting it as measured would violate the project's own non-fabrication rule for this file.</p>
+      </section>
+
+      <section id="bottleneck">
+        <div class="eyebrow">Profiled, not guessed</div>
+        <h2>Where the CPU time actually goes</h2>
+        <p class="lede">The parsing ladder is not the bottleneck. The storage access pattern is.</p>
+        <p>A <code>cProfile</code> run over 2,000 <code>pipeline.process()</code> calls attributed the majority of cumulative time to SQLAlchemy Core's per-statement machinery — cache-key generation, type coercion, statement compilation — rather than to parsing itself (<code>engine.py:run</code> was 3.0s of an 18.2s total). The proximate cause: a single processed event triggers roughly <strong>9–10 separate SQL <code>execute()</code> calls</strong> spread across four write paths (<code>write_event</code>, <code>index_raw</code>, <code>upsert_source</code>, <code>record_unknown</code>) — 19,000 calls for 2,000 events.</p>
+        <div class="panel">
+          <h4>Identified, documented, deliberately not fixed in this build</h4>
+          <p>Batching per-event writes into fewer statements is the highest-leverage next optimization. It was not implemented here — the remaining time budget went to completing documentation, deployment verification, and the demo instead of a storage-layer rewrite this late in the build. That is a stated tradeoff, tracked as the top item in <a href="#pending">what's still pending</a>, not a silently hidden gap.</p>
+        </div>
+      </section>
+
+      <section id="horizontal">
+        <div class="eyebrow">The actual scaling answer</div>
+        <h2>Horizontal scaling — designed, and actually running</h2>
+        <p class="lede">The answer to "how does this scale" is not a faster single process. It's more of them, behind a shared queue.</p>
+
+        <figure role="img" aria-label="Comparison of two topologies: a single process with the ladder and SQLite achieving 177 to 216 events per second, versus a horizontal topology of N collectors feeding a source-partitioned Redis Streams queue consumed by M workers writing to PostgreSQL, of which the two-worker version was actually started and verified healthy in this build.">
+          <svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+            </defs>
+            <g font-family="IBM Plex Mono, monospace" font-size="11.5" fill="currentColor">
+              <text x="10" y="18" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="var(--muted)">SINGLE PROCESS (measured floor)</text>
+              <rect x="10" y="32" width="230" height="70" rx="6" fill="none" stroke="currentColor"/>
+              <text x="125" y="58" text-anchor="middle">Ladder + SQLite</text>
+              <text x="125" y="76" text-anchor="middle" fill="var(--muted)" font-size="10.5">1 thread, unbatched</text>
+              <text x="125" y="120" text-anchor="middle" fill="var(--accent-strong)" font-weight="600">~177 – 216 events/sec</text>
+
+              <line x1="270" y1="65" x2="300" y2="65" stroke="var(--border)" stroke-width="1.4" stroke-dasharray="3 4"/>
+              <text x="285" y="55" text-anchor="middle" font-size="10" fill="var(--muted)">vs.</text>
+
+              <text x="330" y="18" font-family="IBM Plex Sans" font-size="12" font-weight="600" fill="var(--muted)">HORIZONTAL (built, running in this session)</text>
+              <rect x="330" y="32" width="110" height="46" rx="6" fill="none" stroke="currentColor"/>
+              <text x="385" y="59" text-anchor="middle">Collector(s)</text>
+              <rect x="480" y="32" width="150" height="46" rx="6" fill="none" stroke="currentColor"/>
+              <text x="555" y="53" text-anchor="middle">Redis Streams</text>
+              <text x="555" y="68" text-anchor="middle" fill="var(--muted)" font-size="9.5">partitioned by source_id</text>
+              <rect x="670" y="10" width="110" height="46" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+              <text x="725" y="37" text-anchor="middle" fill="var(--accent-strong)">worker-1</text>
+              <rect x="670" y="66" width="110" height="46" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+              <text x="725" y="93" text-anchor="middle" fill="var(--accent-strong)">worker-2</text>
+              <rect x="820" y="38" width="60" height="46" rx="6" fill="none" stroke="currentColor"/>
+              <text x="850" y="65" text-anchor="middle" font-size="10">DB</text>
+
+              <line x1="440" y1="55" x2="476" y2="55" stroke="currentColor" marker-end="url(#arrow3)"/>
+              <line x1="630" y1="50" x2="666" y2="33" stroke="currentColor" marker-end="url(#arrow3)"/>
+              <line x1="630" y1="60" x2="666" y2="89" stroke="currentColor" marker-end="url(#arrow3)"/>
+              <line x1="780" y1="33" x2="816" y2="55" stroke="currentColor" marker-end="url(#arrow3)"/>
+              <line x1="780" y1="89" x2="816" y2="65" stroke="currentColor" marker-end="url(#arrow3)"/>
+
+              <rect x="330" y="140" width="550" height="86" rx="6" fill="var(--good-soft)" stroke="none"/>
+              <text x="345" y="160" fill="var(--good)" font-family="IBM Plex Sans" font-weight="600" font-size="11.5">✓ verified this session</text>
+              <text x="345" y="180" fill="var(--ink-2)" font-size="10.5">docker compose ps → uli-api-1, uli-redis-1, uli-worker-1, uli-worker-2 all Up / healthy</text>
+              <text x="345" y="197" fill="var(--ink-2)" font-size="10.5">e2e suite passing against this exact topology over real HTTP, not a mock</text>
+              <text x="345" y="214" fill="var(--ink-2)" font-size="10.5">not yet measured: an events/sec curve as worker count increases</text>
+            </g>
+          </svg>
+          <figcaption><strong>Fig. 5 — measured floor vs. demonstrated topology.</strong> Drain3 template-mining state is per <code>source_id</code> and shared via Redis, so any worker can serve any source and the routing cache is shared — this is what makes adding workers a capacity lever rather than a partitioning problem.</figcaption>
+        </figure>
+      </section>
+
+      <section id="deploy-topologies">
+        <h3>Deployment topologies</h3>
+        <p><strong>Docker Compose</strong> (this build's primary, verified target): <code>docker compose up --build</code> brings up <code>redis</code> + <code>api</code> + <code>worker</code>×2, with <code>--profile ml</code> and <code>--profile collector</code> as opt-in add-ons. All state lives in the <code>uli-data</code> named volume.</p>
+        <p><strong>Kubernetes</strong> (minimal reference manifests, <code>deployment/kubernetes/</code>): namespace, configmaps, a Redis deployment, and API/worker deployments with a shared PVC. Explicitly documented as <strong>not production-hardened</strong> — no Ingress/TLS/HPA/NetworkPolicy — and with a stated caveat that the default SQLite backend only tolerates a single-node cluster; a real multi-node deployment needs <code>ULI_DB_URL</code> pointed at PostgreSQL (same SQLAlchemy code, dialect switch only — already an optional dependency).</p>
+        <p><strong>Air-gapped</strong>: see <a href="#airgap">§ air-gapped operation</a> below.</p>
+      </section>
+
+      <section id="demonstrate">
+        <div class="eyebrow">Reproduce it yourself</div>
+        <h2>How to demonstrate it</h2>
+        <p class="lede">Everything below was actually run in this session, against the actual running stack — not a hypothetical sequence.</p>
+
+        <h3>1. Bring the stack up</h3>
+        <pre><code class="cmd">docker compose up -d --build   # api + 2 workers + redis
+curl -sf localhost:8080/health</code></pre>
+
+        <h3>2. Run the six-scenario demo script</h3>
+        <pre><code class="cmd">.venv/bin/python scripts/demo.py     # or: make demo</code></pre>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>#</th><th>Scenario</th><th>What it proves</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Known vendor</td><td>A real OpenSSH log line (from <code>logs/samples/ssh/</code>) parses at tier 1–3 with high confidence.</td></tr>
+              <tr><td class="num">2</td><td>Format drift</td><td>The <code>myapp[555]:</code> → <code>myapp(555): INFO</code> example above — both versions still produce a traceable event.</td></tr>
+              <tr><td class="num">3</td><td>Unknown vendor</td><td>The full <code>GIZMOTECH</code> loop from fingerprint to human-approved promotion — see Fig. 2.</td></tr>
+              <tr><td class="num">4</td><td>Resource drift</td><td>Confirms the zero-false-positive default and that the drift endpoint is live.</td></tr>
+              <tr><td class="num">5</td><td>Air-gapped operation</td><td>Ingestion succeeds with zero dependency on outbound reachability.</td></tr>
+              <tr><td class="num">6</td><td>Raw provenance</td><td>The exact original bytes are recoverable, sha256-verified, from the normalized event alone — see Fig. showing the real captured output.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Output observed in this session: all six scenarios printed <code>[PASS]</code> for every assertion and ended with <code>All 6 scenarios completed successfully.</code></p>
+
+        <h3>3. Run the test suite</h3>
+        <pre><code class="cmd">.venv/bin/pytest -m "not performance"      # 92 passed, 0 failed
+.venv/bin/pytest tests/performance -m performance -s   # real throughput/latency, ~10 min</code></pre>
+      </section>
+
+      <section id="testing">
+        <div class="eyebrow">Five layers, each catching a different class of bug</div>
+        <h2>Testing evidence</h2>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>Layer</th><th>Purpose</th><th>Tests collected</th></tr></thead>
+            <tbody>
+              <tr><td>Unit</td><td>Pure logic — fingerprinting, timestamps, structural/declarative parsers, ladder engine, drift math.</td><td class="num">43</td></tr>
+              <tr><td>Integration</td><td>Full in-process pipeline + the HTTP layer via FastAPI's <code>TestClient</code>.</td><td class="num">20</td></tr>
+              <tr><td>Adversarial</td><td>Hostile/malformed input, ReDoS-shaped regex, malformed packs loaded mid-flight.</td><td class="num">21</td></tr>
+              <tr><td>E2E</td><td>Real <code>docker compose</code> deployment over real HTTP — skips (not fails) if the stack isn't up.</td><td class="num">8</td></tr>
+              <tr><td>Performance</td><td>Real measured throughput/latency/CPU/RAM at 3 scales.</td><td class="num">3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>92 passed, 0 failed</strong> on the non-performance suite in this session; 3/3 performance runs passed.</p>
+
+        <div class="panel crit">
+          <h4>Two real bugs found and fixed by testing the running system, not mocks</h4>
+          <p><strong>Unknown-vendor gate</strong> — the pipeline only recorded unknowns for tiers 6–7, contradicting the documented tiers 4–7 requirement. Found by checking the code against the project's own architecture spec, not just against existing (also-wrong) test expectations.</p>
+          <p><strong><code>GET /v1/raw/{id}</code> returned HTTP 500</strong> — a hand-built response bypassed FastAPI's JSON encoder and choked on a raw <code>datetime</code>. Invisible to 43 passing unit tests and the pre-existing integration suite, because none of them exercised this route through real HTTP serialization. Found only by <code>curl</code>-ing the live Docker deployment and reading its logs. Both are fixed, and both are now permanently regression-tested.</p>
+        </div>
+      </section>
+
+      <section id="security">
+        <div class="eyebrow">What's implemented vs. what's declared</div>
+        <h2>Security posture</h2>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>Control</th><th>Status</th><th>Detail</th></tr></thead>
+            <tbody>
+              <tr><td>Tenant isolation</td><td><span class="status status-met">implemented</span></td><td><code>tenant_id</code> comes only from the authenticated identity, never the request body — every route threads it through.</td></tr>
+              <tr><td>Auth</td><td><span class="status status-gap">partial</span></td><td><code>none</code> (default, local/demo) or static <code>X-API-Key</code> → tenant map. No OAuth/mTLS/SSO.</td></tr>
+              <tr><td>ReDoS protection</td><td><span class="status status-met">implemented</span></td><td>Every pack regex runs with a real wall-clock timeout (50 ms default) via the <code>regex</code> module, not stdlib <code>re</code>.</td></tr>
+              <tr><td>Malformed-pack safety</td><td><span class="status status-met">implemented</span></td><td><code>yaml.safe_load</code> only — a pack can describe extraction, never execute code.</td></tr>
+              <tr><td>Input bounds</td><td><span class="status status-met">implemented</span></td><td>64 KiB line cap for parsing (raw bytes kept whole regardless), 8 MiB request-body cap.</td></tr>
+              <tr><td>Bundle signing</td><td><span class="status status-no">not implemented</span></td><td>Config fields exist (<code>bundle_pubkey_path</code>) and a <code>cryptography</code> dependency is declared but never imported. <code>POST /v1/parsers/bundles</code> trusts any authenticated caller's YAML today.</td></tr>
+              <tr><td>TLS / rate limiting</td><td><span class="status status-no">not implemented</span></td><td>Assumed to sit behind a reverse proxy in any real deployment.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="airgap">
+        <div class="eyebrow">Runs with zero outbound network dependency</div>
+        <h2>Air-gapped operation</h2>
+        <p class="lede">No log-parsing decision, no model, and no dependency install happens at runtime — everything is baked in at image-build time.</p>
+        <p><code>deployment/airgap/build_bundle.sh</code> builds all four images, <code>docker save</code>s them, and packages them with vendor packs, schemas, sample datasets, and docs into one tarball plus a generated <code>LOAD.sh</code> that <code>docker load</code>s everything and brings the stack up with zero network access. The bundle is <strong>SHA-256 checksummed</strong> for transfer integrity — <strong>not yet code-signed</strong> (see security posture above; this was corrected in this build rather than left as an inaccurate claim in the README).</p>
+        <p>Verified in this session: the full compose stack starts and correctly ingests/parses/serves events with no outbound call anywhere in that path. Not verified: a full build→bundle→reload cycle on a genuinely offline second host (the script was syntax-checked, not run end-to-end offline, due to time budget).</p>
+      </section>
+
+      <section id="pending">
+        <div class="eyebrow">Asked directly — answered directly</div>
+        <h2>What's still pending</h2>
+        <p class="lede">Nothing here is a surprise buried in code — every item below is also called out in <code>docs/roadmap.md</code> and, where relevant, inline in the section above it.</p>
+
+        <h3>Highest-leverage, worth doing next</h3>
+        <div class="panel">
+          <p><strong>Batch per-event SQL writes.</strong> Profiling found ~9–10 individual <code>execute()</code> calls per event across four write paths; batching these is the clearest lever on the measured throughput ceiling (<a href="#bottleneck">§ where the time goes</a>).</p>
+        </div>
+
+        <h3>Security</h3>
+        <ul>
+          <li>Bundle signing (Ed25519) — config fields exist, no implementation.</li>
+          <li>Auth beyond static API keys (OAuth / mTLS / SSO).</li>
+          <li>TLS termination and rate limiting — assumed to be handled by a fronting proxy.</li>
+        </ul>
+
+        <h3>Storage and scale</h3>
+        <ul>
+          <li>Object-storage raw backend and a ClickHouse analytics adapter — interfaces implied, no adapter written.</li>
+          <li>Kafka/NATS queue backend — only Redis Streams and an in-process queue exist today.</li>
+          <li>An events/sec-vs-worker-count benchmark for the horizontal topology — the topology is verified functionally correct, not throughput-benchmarked.</li>
+          <li>1M / 10M-event single-process runs — not executed; would take ~94 min / ~16 hr at the measured rate, outside this build's time budget.</li>
+        </ul>
+
+        <h3>ML</h3>
+        <ul>
+          <li>Model persistence across worker restarts (in-memory only today).</li>
+          <li>An offline precision/recall evaluation harness for anomaly scores.</li>
+        </ul>
+
+        <h3>Detection and deployment</h3>
+        <ul>
+          <li>Splitting an unknown-vendor cluster that merged two distinct formats via a family-hash collision.</li>
+          <li>Kubernetes API probing for resource drift (only <code>psutil</code> + Docker Engine API are live).</li>
+          <li>Kubernetes manifests are reference-only — no Ingress/TLS/HPA/NetworkPolicy.</li>
+          <li>A full air-gapped build→bundle→reload cycle on a genuinely offline second host.</li>
+        </ul>
+
+        <h3>Deliberately not planned (scope decisions, not gaps)</h3>
+        <ul>
+          <li>Neural/LLM-based log parsing — evaluated and excluded: higher latency/cost and air-gap friction for a job the deterministic + statistical tiers already handle.</li>
+          <li>Auto-remediation of resource/config drift — the correlator produces evidence for a human, by design, and never acts on its own.</li>
+        </ul>
+      </section>
+
+      <section id="novelty">
+        <div class="eyebrow">Classified honestly, not oversold</div>
+        <h2>Novelty, scoped honestly</h2>
+        <p class="lede">Nothing here claims to be a new algorithm.</p>
+        <p>Declarative log parsing, Drain3 template mining, Jensen–Shannon drift detection, Needleman–Wunsch sequence alignment, Isolation Forest anomaly scoring, and desired-state-vs-observed infrastructure drift are all established, cited prior art (<code>docs/research.md</code> §1–8). The claimed contribution is narrower: assembling unknown-format handling, parser-drift detection with human-approved evolution, and resource/config drift into <strong>one pipeline</strong>, with <strong>one</strong> raw-store/provenance model and <strong>one</strong> event schema — so an operator sees log-format drift and infrastructure drift correlated on one timeline instead of stitched together from separate tools. That combination, and the hypothesis that template alignment recovers usable field mappings after drift, are flagged as requiring further validation at production scale, not asserted as proven.</p>
+      </section>
+
+      <section id="map">
+        <div class="eyebrow">Orientation</div>
+        <h2>Repository map</h2>
+        <div class="scroll-x">
+          <pre><code>uli/              core package — engine, pipeline, parsers, drift, storage, api, ml
+parsers/vendors/  declarative YAML parser packs (hot-loaded, no rebuild)
+collector/        Go syslog/file collector — dumb forwarder, no parsing
+deployment/       Dockerfiles, compose, air-gap bundler, k8s manifests
+docs/             architecture, research, and this report's 14 companion documents
+tests/            unit · integration · adversarial · e2e · performance
+scripts/          fetch_logs.py (real datasets) · demo.py (six-scenario demo)
+logs/samples/     12 real datasets (Loghub + SecRepo), each with a license note</code></pre>
+        </div>
+      </section>
+
+      <div class="footer">
+        Generated from the actual repository state and live-verified command output on 2026-09-06. Full detail behind every claim above lives in <code>docs/</code> — start at <code>docs/final-report.md</code> for the audit trail, or <code>README.md</code> for the operator walkthrough.
+      </div>
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

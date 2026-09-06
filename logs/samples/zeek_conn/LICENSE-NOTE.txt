@@ -1,0 +1,5 @@
+Source: SecRepo — https://www.secrepo.com (Mike Sconzo). See site for per-file terms; sample redistributed for research/demo with attribution.
+
+Vendor/format: Zeek/Bro / Zeek TSV conn.log
+Sample: first 2000 of 22694356 lines.
+Archive md5: e4a481214f81635f581e5cdad57b968b

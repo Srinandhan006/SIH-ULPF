@@ -1,0 +1,37 @@
+parser_id: vendor.zeek.conn
+version: 1.0.0
+vendor: Zeek (Bro)
+product: conn.log
+description: >
+  Zeek/Bro conn.log, tab-separated: ts uid id.orig_h id.orig_p id.resp_h id.resp_p proto
+  service duration orig_bytes resp_bytes conn_state ... (field order per Zeek's default
+  conn.log; positions below match the standard field set on secrepo's maccdc2012 sample).
+compat: { envelope: uli.v1, ocsf: ">=1.6 <2" }
+signatures:
+  - kind: regex
+    pattern: '^\d{10}\.\d{6}\t[A-Za-z0-9]{10,24}\t\d{1,3}(?:\.\d{1,3}){3}\t\d+\t\d{1,3}(?:\.\d{1,3}){3}\t\d+\t(tcp|udp|icmp)\t'
+    required: true
+extract:
+  - kind: split
+    field: raw
+    delimiter: "\t"
+    columns: [ts_epoch, uid, orig_h, orig_p, resp_h, resp_p, proto, service, duration, orig_bytes, resp_bytes, conn_state, local_orig, local_resp, missed_bytes, history, orig_pkts, orig_ip_bytes, resp_pkts, resp_ip_bytes, tunnel_parents]
+map:
+  class_uid: 4001
+  activity_id: 6
+  fields:
+    time: { from: ts_epoch, type: ts }
+    src_endpoint.ip: { from: orig_h }
+    src_endpoint.port: { from: orig_p, type: int }
+    dst_endpoint.ip: { from: resp_h }
+    dst_endpoint.port: { from: resp_p, type: int }
+    connection_info.protocol_name: { from: proto }
+    connection_info.uid: { from: uid }
+    traffic.bytes_in: { from: resp_bytes, type: int }
+    traffic.bytes_out: { from: orig_bytes, type: int }
+    duration: { from: duration, type: float }
+    status_detail: { from: conn_state }
+  unmapped: keep
+confidence:
+  base: 0.92
+  require: [orig_h, resp_h]

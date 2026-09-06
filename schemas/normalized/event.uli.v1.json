@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uli.local/schemas/normalized/event.uli.v1.json",
+  "title": "ULI NormalizedEvent v1",
+  "type": "object",
+  "required": ["event_id", "schema_version", "tenant_id", "source_id", "provenance", "ocsf"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "schema_version": {"const": "uli.v1"},
+    "tenant_id": {"type": "string"},
+    "project_id": {"type": "string"},
+    "source_id": {"type": "string"},
+    "provenance": {
+      "type": "object",
+      "required": ["raw_event_id", "raw_segment", "raw_offset", "raw_length", "parser_id", "parser_version", "tier", "confidence"],
+      "properties": {
+        "raw_event_id": {"type": "string"}, "raw_segment": {"type": "string"}, "raw_offset": {"type": "integer"}, "raw_length": {"type": "integer"},
+        "received_at": {"type": "string"}, "processed_at": {"type": "string"}, "transport": {"type": "string"}, "peer": {"type": ["string", "null"]},
+        "parser_id": {"type": "string"}, "parser_version": {"type": "string"}, "normalizer_version": {"type": "string"},
+        "template_id": {"type": ["string", "null"]}, "tier": {"type": "integer", "minimum": 1, "maximum": 7},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1}, "confidence_factors": {"type": "object"},
+        "shape_hash": {"type": "string"}, "family_hash": {"type": "string"},
+        "duplicate_of": {"type": ["string", "null"]}, "shadow_of": {"type": ["string", "null"]},
+        "processing_errors": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "ocsf": {
+      "type": "object",
+      "required": ["class_uid", "category_uid", "time"],
+      "properties": {
+        "class_uid": {"type": "integer"}, "class_name": {"type": "string"}, "category_uid": {"type": "integer"},
+        "activity_id": {"type": "integer"}, "type_uid": {"type": "integer"}, "severity_id": {"type": "integer"},
+        "time": {"type": ["integer", "null"]}, "metadata": {"type": "object"},
+        "src_endpoint": {"type": "object"}, "dst_endpoint": {"type": "object"}, "connection_info": {"type": "object"},
+        "observables": {"type": "array"}, "unmapped": {"type": "object"}, "raw_data": {"type": ["string", "null"]}
+      }
+    },
+    "message": {"type": "string"},
+    "anomaly": {"type": "object"}
+  }
+}

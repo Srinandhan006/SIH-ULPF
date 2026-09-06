@@ -1,0 +1,6 @@
+Source: Loghub (logpai) — https://github.com/logpai/loghub, Zenodo record 3227177.
+License: free for research/academic use with citation: Jieming Zhu et al., 'Loghub: A Large Collection of System Log Datasets for AI-driven Log Analytics', ISSRE 2023. This notice must accompany copies.
+
+Vendor/format: Apache Hadoop / log4j
+Sample: first 2000 of 394310 lines.
+Archive md5: 6dfc442b9e86adb519db9437d4e7d3d4

@@ -1,0 +1,10 @@
+.venv
+.git
+.pytest_cache
+logs/samples
+data
+**/__pycache__
+**/*.pyc
+.env
+collector/uli-collector
+deployment/airgap/*.tar.gz

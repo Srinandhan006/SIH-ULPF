@@ -1,0 +1,9 @@
+FROM golang:1.22-alpine AS builder
+WORKDIR /build
+COPY collector/go.mod ./
+COPY collector/cmd ./cmd
+RUN CGO_ENABLED=0 go build -o /uli-collector ./cmd/uli-collector
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /uli-collector /uli-collector
+ENTRYPOINT ["/uli-collector"]

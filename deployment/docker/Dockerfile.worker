@@ -1,0 +1,19 @@
+FROM python:3.12-slim AS builder
+WORKDIR /build
+RUN pip install --no-cache-dir --upgrade pip
+COPY pyproject.toml README.md ./
+COPY uli ./uli
+RUN pip install --no-cache-dir --prefix=/install .
+
+FROM python:3.12-slim AS runtime
+RUN groupadd -r uli && useradd -r -g uli -d /app uli
+COPY --from=builder /install /usr/local
+WORKDIR /app
+COPY uli ./uli
+COPY schemas ./schemas
+COPY parsers ./parsers
+COPY pyproject.toml README.md ./
+RUN mkdir -p /app/data /app/models && chown -R uli:uli /app
+USER uli
+ENV ULI_DATA_DIR=/app/data ULI_PARSERS_DIR=/app/parsers ULI_SCHEMAS_DIR=/app/schemas ULI_MODE=distributed
+CMD ["python", "-m", "uli.workers.runner"]

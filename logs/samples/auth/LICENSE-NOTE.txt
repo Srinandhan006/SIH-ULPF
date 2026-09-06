@@ -1,0 +1,5 @@
+Source: SecRepo — https://www.secrepo.com (Mike Sconzo). See site for per-file terms; sample redistributed for research/demo with attribution.
+
+Vendor/format: Linux auth.log / BSD syslog
+Sample: first 2000 of 86839 lines.
+Archive md5: 591f7bb3f3ace28f53d3761d5db38ee2

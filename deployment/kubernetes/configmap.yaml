@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uli-config
+  namespace: uli
+data:
+  ULI_LOG_LEVEL: "INFO"
+  ULI_LOG_JSON: "true"
+  ULI_QUEUE_BACKEND: "redis"
+  ULI_REDIS_URL: "redis://uli-redis:6379/0"
+  ULI_AUTH: "none"
+  ULI_ML_ENABLED: "false"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uli-desired-state
+  namespace: uli
+data:
+  desired-state.yaml: |
+    # Same file as deployment/desired-state.yaml -- edit here for the cluster's own capacity plan.
+    # Every key optional; absent key is never compared (no false positives out of the box).

@@ -1,0 +1,6 @@
+Source: Loghub (logpai) — https://github.com/logpai/loghub, Zenodo record 3227177.
+License: free for research/academic use with citation: Jieming Zhu et al., 'Loghub: A Large Collection of System Log Datasets for AI-driven Log Analytics', ISSRE 2023. This notice must accompany copies.
+
+Vendor/format: HealthApp (Android) / pipe-delimited app log
+Sample: first 2000 of 253395 lines.
+Archive md5: cec2cca71da9c4f8e33eaa9b215f1b90

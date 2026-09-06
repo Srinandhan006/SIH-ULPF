@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://uli.local/schemas/vendors/pack.schema.json",
+  "title": "ULI declarative parser pack",
+  "type": "object",
+  "required": ["parser_id", "version", "signatures"],
+  "additionalProperties": false,
+  "properties": {
+    "parser_id": {"type": "string", "pattern": "^[a-z0-9_.-]{3,128}$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "vendor": {"type": "string"},
+    "product": {"type": "string"},
+    "product_version": {"type": "string"},
+    "description": {"type": "string"},
+    "compat": {"type": "object", "properties": {"envelope": {"type": "string"}, "ocsf": {"type": "string"}}},
+    "pre": {"type": "string", "enum": ["structural.syslog3164", "structural.syslog5424", "structural.json", "structural.cef", "structural.leef", "structural.kv", "structural.clf", "structural.log4j", "structural.apache_error"]},
+    "signatures": {
+      "type": "array", "minItems": 1,
+      "items": {"type": "object", "required": ["kind"], "properties": {
+        "kind": {"enum": ["syslog_app", "prefix", "contains", "regex", "shape_family", "json_keys", "token_count"]},
+        "equals": {"type": "string"}, "startswith": {"type": "string"}, "value": {"type": "string"}, "pattern": {"type": "string", "maxLength": 512},
+        "within": {"type": "integer", "minimum": 1, "maximum": 65536}, "all": {"type": "array", "items": {"type": "string"}},
+        "min": {"type": "integer"}, "max": {"type": "integer"}, "required": {"type": "boolean"}}}
+    },
+    "extract": {
+      "type": "array",
+      "items": {"type": "object", "required": ["kind"], "properties": {
+        "kind": {"enum": ["regex", "grok_lite", "csv", "split", "kv", "json_path", "positional", "const"]},
+        "field": {"type": "string"}, "pattern": {"type": "string", "maxLength": 2048}, "optional": {"type": "boolean"},
+        "delimiter": {"type": "string", "maxLength": 4}, "quote": {"type": "string", "maxLength": 1},
+        "columns": {"type": "array", "items": {"type": "string"}}, "rest_field": {"type": "string"}, "min_columns": {"type": "integer"},
+        "sep": {"type": "string"}, "pair_sep": {"type": "string"}, "paths": {"type": "object"},
+        "positions": {"type": "object"}, "values": {"type": "object"}}}
+    },
+    "map": {
+      "type": "object",
+      "properties": {
+        "class_uid": {"type": "integer"}, "activity_id": {"type": "integer"}, "message_from": {"type": "string"},
+        "unmapped": {"enum": ["keep", "drop"]},
+        "fields": {"type": "object", "additionalProperties": {"type": "object", "properties": {
+          "from": {"type": "string"}, "const": {}, "default": {}, "type": {"enum": ["int", "float", "str", "bool", "ts", "severity"]},
+          "lower": {"type": "boolean"}, "enum": {"type": "object"}, "enum_default": {}}}}
+      }
+    },
+    "confidence": {"type": "object", "properties": {"base": {"type": "number", "minimum": 0, "maximum": 1}, "require": {"type": "array", "items": {"type": "string"}}}},
+    "samples": {"type": "array", "items": {"type": "string"}},
+    "provenance": {"type": "object"}
+  }
+}
