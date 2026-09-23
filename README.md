@@ -77,9 +77,18 @@ docker compose --profile collector up --build # + Go syslog/file collector
 
 Services: `api` (:8080), `worker` (x2, no exposed port), `redis` (:6379),
 optional `ml` (:8090), optional `collector` (:5514 udp/tcp). All state lives
-in the `uli-data` named volume. Measured image sizes and resource use are in
+in `./data` (a plain bind-mounted folder, not a Docker volume — visible and
+inspectable on the host). Measured image sizes and resource use are in
 [`docs/ml-strategy.md`](docs/ml-strategy.md) and [`docs/scalability.md`](docs/scalability.md)
 (measured on this machine, not fabricated).
+
+A web console (React) is served at `http://localhost:8080/ui` — a live event
+table, an ingest playground with verified tier-classification examples, the
+7-tier ladder view, and a worker-scaling simulator. It's built automatically
+as part of `docker compose build` (a Node build stage in
+[`Dockerfile.api`](deployment/docker/Dockerfile.api) — no separate `npm run
+build` step needed). To run the UI in dev mode with hot reload instead:
+`cd ui && npm install && npm run dev`.
 
 Minimal, non-production-hardened Kubernetes manifests for the same images are in
 [`deployment/kubernetes/`](deployment/kubernetes/README.md) (`kubectl apply -f

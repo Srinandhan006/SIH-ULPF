@@ -9,3 +9,4 @@ data
 collector/uli-collector
 deployment/airgap/*.tar.gz
 ui/node_modules
+ui/dist
