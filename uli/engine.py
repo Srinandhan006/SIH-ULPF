@@ -2,6 +2,7 @@
 guarantees P1 (total pipeline): whatever happens inside, `run()` always returns an IR."""
 from __future__ import annotations
 
+import hashlib
 import time
 from pathlib import Path
 from threading import Lock
@@ -18,6 +19,7 @@ from uli.parsers.declarative import load_pack_yaml
 from uli.parsers.inference import infer
 from uli.parsers.structural import STRUCTURAL_PARSERS
 from uli.parsers.templates import TemplateMinerPool
+from uli.security.signing import load_public_key, verify_bytes
 
 log = get_logger("engine")
 
@@ -73,6 +75,7 @@ class ParserEngine:
         self.ml = MLClient(settings)
         self._routing_cache: dict[str, str] = {}
         self._lock = Lock()
+        self._pubkey_cache: tuple[Path, Any] | None = None
         self.load_parsers_dir(settings.parsers_dir / "vendors")
 
     # ------------------------------------------------------------- registry
@@ -82,13 +85,34 @@ class ParserEngine:
             return errors
         for f in sorted(path.glob("*.yaml")) + sorted(path.glob("*.yml")):
             try:
-                self.register_pack(f.read_text(encoding="utf-8"), origin=str(f))
+                sig_path = f.with_suffix(f.suffix + ".sig")
+                signature = sig_path.read_text(encoding="ascii").strip() if sig_path.exists() else None
+                self.register_pack(f.read_text(encoding="utf-8"), origin=str(f), signature=signature)
             except Exception as e:  # noqa: BLE001
                 errors.append(f"{f.name}: {e}")
                 log.error("pack_load_failed", file=str(f), error=str(e)[:300])
         return errors
 
-    def register_pack(self, yaml_text: str, *, origin: str = "api", status: str = "active") -> Parser:
+    def _verify_signature(self, yaml_text: str, signature: str | None) -> bool:
+        """True only if a pubkey is configured, a signature was supplied, and it cryptographically
+        verifies. Anything short of that is honestly False — see docs/security.md §5: this used to
+        be hardcoded True (i.e. claimed-but-not-checked), which is exactly the gap this closes."""
+        if signature is None or not self.settings.bundle_pubkey_path:
+            return False
+        try:
+            path = self.settings.bundle_pubkey_path
+            if self._pubkey_cache is None or self._pubkey_cache[0] != path:
+                self._pubkey_cache = (path, load_public_key(Path(path).read_bytes()))
+            return verify_bytes(yaml_text.encode("utf-8"), signature, self._pubkey_cache[1])
+        except (ValueError, FileNotFoundError, OSError) as e:
+            log.warning("signature_verify_error", error=str(e)[:200])
+            return False
+
+    def register_pack(self, yaml_text: str, *, origin: str = "api", status: str = "active", signature: str | None = None) -> Parser:
+        bundle_sha256 = hashlib.sha256(yaml_text.encode("utf-8")).hexdigest()
+        signature_ok = self._verify_signature(yaml_text, signature)
+        if self.settings.bundle_require_signature and not signature_ok:
+            raise ValueError(f"bundle signature required and missing/invalid (origin={origin}, sha256={bundle_sha256[:12]})")
         p = load_pack_yaml(yaml_text, self.settings.schemas_dir, self.settings.regex_timeout_ms, status=status)
         with self._lock:
             self.declarative[p.id] = p
@@ -96,9 +120,9 @@ class ParserEngine:
         if self.storage:
             self.storage.upsert_parser(parser_id=p.id, version=p.version, kind=p.kind.value, vendor=p.vendor, product=p.product,
                                        signatures=[{k: v for k, v in s.items() if not k.startswith("_")} for s in p._sigs],
-                                       compat=p.spec.get("compat", {}), status=status, yaml=yaml_text, bundle_sha256=None, signature_ok=True)
-            self.storage.audit("*", "system", "parser.load", p.id, {"origin": origin, "version": p.version})
-        log.info("parser_registered", parser_id=p.id, version=p.version, origin=origin)
+                                       compat=p.spec.get("compat", {}), status=status, yaml=yaml_text, bundle_sha256=bundle_sha256, signature_ok=signature_ok)
+            self.storage.audit("*", "system", "parser.load", p.id, {"origin": origin, "version": p.version, "signature_ok": signature_ok})
+        log.info("parser_registered", parser_id=p.id, version=p.version, origin=origin, signature_ok=signature_ok)
         return p
 
     def retire_pack(self, parser_id: str) -> bool:

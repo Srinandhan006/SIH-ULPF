@@ -46,19 +46,37 @@ protections, both verified by the adversarial test suite (`tests/adversarial/`):
 is never lossy, only the parse attempt is bounded). `max_ingest_body_bytes` (8 MiB) caps request
 body size at the API layer.
 
-## 5. Bundle signing — declared, not implemented (be precise about this)
+## 5. Bundle signing — implemented (Ed25519)
 
-`Settings.bundle_pubkey_path` / `bundle_require_signature` exist as config fields, and
-`architecture.md` §8 states the target design ("Bundles are Ed25519-signed"). **No signature
-generation or verification code exists in this build** — `cryptography>=42` is declared in
-`pyproject.toml`'s main dependencies (evidence the intent was there) but is never imported anywhere
-under `uli/` (confirmed by grep across the whole package); there is no Ed25519/`nacl` usage either. `POST /v1/parsers/bundles` accepts any syntactically valid YAML pack from
-an authenticated tenant with no signature check. This is the single biggest gap between documented
-intent and implemented behavior in the system, and it is recorded here and in
-`docs/roadmap.md`/`docs/air-gapped-deployment.md` rather than silently left for someone to
-discover. Mitigation today is authentication (§2) plus the sandboxing in §3 (a pack cannot execute
-code even if it comes from a compromised or malicious source) — signing would add non-repudiation
-and origin verification on top of that, not replace it.
+`uli/security/signing.py` implements Ed25519 sign/verify over `cryptography`'s
+`Ed25519PrivateKey`/`Ed25519PublicKey` (the dependency was declared but unused before this; now it
+is). Detached, base64-encoded signatures, never embedded/executed — a pack still cannot run code
+even with a valid signature (§3's sandboxing is unrelated and still the primary mitigation for
+malicious *content*; signing is about *origin*, not content safety).
+
+- **CLI**: `python scripts/sign_bundle.py {keygen,sign,verify}` — generates an Ed25519 keypair,
+  signs a file, or verifies a file+signature+pubkey. Same tool for parser packs and air-gap
+  tarballs (`docs/air-gapped-deployment.md` §3).
+- **API**: `POST /v1/parsers/bundles` accepts an optional `signature` field (base64, over the
+  `yaml` field's UTF-8 bytes); `uli/api/app.py:load_bundle` passes it to `engine.register_pack`.
+- **File-drop**: `ParserEngine.load_parsers_dir` looks for a sibling `<pack>.yaml.sig` next to each
+  pack and verifies it the same way.
+- **Verification**: `ParserEngine.register_pack` computes a real `bundle_sha256` (previously always
+  `None`) and an honest `signature_ok` (previously **hardcoded `True` regardless of whether
+  anything was checked** — that was the actual gap, not just "no code exists"). `signature_ok` is
+  `True` only if `ULI_BUNDLE_PUBKEY_PATH` is configured, a signature was supplied, and it
+  cryptographically verifies against that key; otherwise `False`.
+- **Enforcement**: `ULI_BUNDLE_REQUIRE_SIGNATURE=true` makes `register_pack` raise (HTTP 422 via
+  the API, a load error logged and skipped for file-drop) on a missing or invalid signature,
+  instead of silently accepting an unverified pack.
+- **Tests**: `tests/unit/test_signing.py` (roundtrip, tamper detection, wrong key, garbage input —
+  all fail closed, never raise) and `tests/integration/test_bundle_signing.py` (the actual
+  `register_pack`/`load_parsers_dir` enforcement paths).
+
+Private keys are never committed (`deployment/keys/`, `*.pem` gitignored); operators generate their
+own via `scripts/sign_bundle.py keygen` and distribute only the public key to verifying nodes.
+Authentication (§2) and pack sandboxing (§3) remain the mitigations for a caller with no key at
+all; signing adds non-repudiation and origin verification on top, for deployments that turn it on.
 
 ## 6. What this is / is not
 
@@ -71,7 +89,8 @@ unknown-vendor handling).
 
 ## 7. Known limitations (consolidated)
 
-- No bundle signing (§5).
+- Signing is opt-in, not the default (§5) — an operator who never sets `ULI_BUNDLE_PUBKEY_PATH` /
+  `ULI_BUNDLE_REQUIRE_SIGNATURE` still gets the old accept-any-authenticated-YAML behavior.
 - No TLS termination is configured in `docker-compose.yml`/`deployment/kubernetes/` — assumed to
   sit behind a reverse proxy or service mesh in any real deployment.
 - No rate limiting on `/v1/ingest`.

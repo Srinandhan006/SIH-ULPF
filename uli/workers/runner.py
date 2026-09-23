@@ -31,13 +31,12 @@ def main() -> None:
     for batch in stack.queue.consume(consumer_name, block_ms=1000, count=200):
         if stop["flag"]:
             break
-        ids = []
-        for msg in batch:
+        if batch:
             try:
-                stack.pipeline.process(msg.envelope)
-            except Exception as e:  # noqa: BLE001 — pipeline.process is documented total; this is a last-resort log
-                log.error("worker_process_unexpected_exception", error=str(e)[:300])
-            ids.append(msg.id)
+                stack.pipeline.process_batch([msg.envelope for msg in batch])
+            except Exception as e:  # noqa: BLE001 — process_batch is documented total; this is a last-resort log
+                log.error("worker_process_batch_unexpected_exception", error=str(e)[:300])
+        ids = [msg.id for msg in batch]
         if ids:
             stack.queue.ack(ids)
         now = time.monotonic()

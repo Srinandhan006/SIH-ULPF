@@ -27,7 +27,7 @@ services:
       ULI_MODE: local
       ULI_API_PORT: "8080"
     ports: ["8080:8080"]
-    volumes: ["uli-data:/app/data", "./parsers/vendors:/app/parsers/vendors:ro", "./deployment/desired-state.yaml:/app/deployment/desired-state.yaml:ro"]
+    volumes: ["./data:/app/data", "./parsers/vendors:/app/parsers/vendors:ro", "./deployment/desired-state.yaml:/app/deployment/desired-state.yaml:ro"]
     depends_on: {redis: {condition: service_healthy}}
     healthcheck: {test: ["CMD", "curl", "-sf", "http://localhost:8080/health"], interval: 10s, timeout: 3s, retries: 10, start_period: 5s}
     restart: unless-stopped
@@ -37,7 +37,7 @@ services:
     environment:
       <<: *common-env
       ULI_MODE: distributed
-    volumes: ["uli-data:/app/data", "./parsers/vendors:/app/parsers/vendors:ro", "./deployment/desired-state.yaml:/app/deployment/desired-state.yaml:ro"]
+    volumes: ["./data:/app/data", "./parsers/vendors:/app/parsers/vendors:ro", "./deployment/desired-state.yaml:/app/deployment/desired-state.yaml:ro"]
     depends_on: {redis: {condition: service_healthy}}
     deploy: {replicas: 2}
     restart: unless-stopped
@@ -59,5 +59,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  uli-data: {}
   uli-ml-models: {}

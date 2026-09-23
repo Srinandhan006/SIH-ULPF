@@ -1,0 +1,5 @@
+Jun 14 15:16:01 web1 sshd[1234]: Failed password for root from 1.2.3.4 port 4444 ssh2
+{"level":"error","msg":"disk full","host":"db1"}
+CEF:0|Vendor|Product|1.0|100|Login Success|3|src=10.0.0.1 dst=10.0.0.2 spt=1234
+1157689312.049   5006 10.105.21.199 TCP_MISS/200 19763 CONNECT login.yahoo.com:443 badeyek DIRECT/209.73.177.115 -
+TOTALLYFAKEDEVICE-XJ9 status weird code 7 flavor purple

@@ -7,6 +7,8 @@ from typing import Any
 
 import orjson
 from sqlalchemy import (JSON, Boolean, Column, DateTime, Float, Integer, MetaData, String, Table, Text, create_engine, event, func, select, text, update)
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from uli.ids import ulid
@@ -156,12 +158,41 @@ class SQLStorage:
     def _begin(self):
         return self.engine.begin()
 
+    def _upsert(self, table: Table):
+        """Dialect-specific INSERT builder with ON CONFLICT support (same shape on both SQLite and
+        PostgreSQL) — used to collapse per-row select-then-insert-or-update into one multi-row
+        statement (docs/scalability.md §2: this is the fix for the per-event SQL round-trip
+        overhead that was profiled but not implemented in the original build)."""
+        return sqlite_insert(table) if self.is_sqlite else pg_insert(table)
+
     # ------------------------------------------------------------- raw
     def index_raw(self, rec: RawRecord, loc: RawLocation) -> None:
         with STORAGE_LATENCY.labels("index_raw").time(), self._begin() as c:
             exists = c.execute(select(raw_index.c.raw_event_id).where(raw_index.c.raw_event_id == rec.raw_event_id, raw_index.c.tenant_id == rec.tenant_id)).first()
             if exists is None:
                 c.execute(raw_index.insert().values(raw_event_id=rec.raw_event_id, tenant_id=rec.tenant_id, source_id=rec.source_id, segment=loc.segment, offset=loc.offset, length=loc.length, received_at=rec.received_at))
+
+    def find_raw_locations(self, tenant_id: str, raw_event_ids: list[str]) -> dict[str, dict]:
+        """Batched dedup lookup: one SELECT ... IN (...) instead of one SELECT per event."""
+        if not raw_event_ids:
+            return {}
+        with self._begin() as c:
+            rows = c.execute(select(raw_index).where(raw_index.c.tenant_id == tenant_id, raw_index.c.raw_event_id.in_(raw_event_ids))).all()
+        return {r.raw_event_id: {"segment": r.segment, "offset": r.offset, "length": r.length} for r in rows}
+
+    def index_raw_bulk(self, items: list[tuple[RawRecord, RawLocation]]) -> None:
+        """One multi-row INSERT ... ON CONFLICT DO NOTHING for a whole batch of new raw records —
+        the on-conflict clause covers the (rare) race of two workers indexing the same content-hash
+        concurrently, which the old select-then-insert path also didn't protect against."""
+        if not items:
+            return
+        rows = [dict(raw_event_id=rec.raw_event_id, tenant_id=rec.tenant_id, source_id=rec.source_id,
+                     segment=loc.segment, offset=loc.offset, length=loc.length, received_at=rec.received_at)
+                for rec, loc in items]
+        stmt = self._upsert(raw_index).values(rows)
+        stmt = stmt.on_conflict_do_nothing(index_elements=[raw_index.c.raw_event_id, raw_index.c.tenant_id])
+        with STORAGE_LATENCY.labels("index_raw_bulk").time(), self._begin() as c:
+            c.execute(stmt)
 
     def get_raw_location(self, tenant_id: str, raw_event_id: str):
         with self._begin() as c:
@@ -265,6 +296,26 @@ class SQLStorage:
                 if inc:
                     vals["event_count"] = (r[0] or 0) + inc
                 c.execute(update(sources).where(sources.c.tenant_id == tenant_id, sources.c.source_id == source_id).values(**vals))
+
+    def upsert_sources_bulk(self, tenant_id: str, aggs: dict[str, dict]) -> None:
+        """Batch version of upsert_source: one INSERT ... ON CONFLICT DO UPDATE covering every
+        distinct source_id in a processed batch, instead of a SELECT+INSERT/UPDATE pair per event.
+        `aggs`: source_id -> {"inc": int, "transport": str, "active_parser_id": str}."""
+        if not aggs:
+            return
+        now = _now()
+        rows = [dict(tenant_id=tenant_id, source_id=source_id, display_name=source_id, first_seen=now, last_seen=now,
+                     event_count=a.get("inc", 0), transport=a.get("transport"), active_parser_id=a.get("active_parser_id"))
+                for source_id, a in aggs.items()]
+        ins = self._upsert(sources)
+        stmt = ins.values(rows).on_conflict_do_update(
+            index_elements=[sources.c.tenant_id, sources.c.source_id],
+            set_=dict(last_seen=ins.excluded.last_seen, transport=ins.excluded.transport,
+                      active_parser_id=ins.excluded.active_parser_id,
+                      event_count=sources.c.event_count + ins.excluded.event_count),
+        )
+        with STORAGE_LATENCY.labels("upsert_sources_bulk").time(), self._begin() as c:
+            c.execute(stmt)
 
     def get_source(self, tenant_id: str, source_id: str) -> dict | None:
         with self._begin() as c:

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Universal Log Intelligence — how it works</title>
+<style>
+:root{
+  --bg:#fbfbfa; --surface:#ffffff; --surface-2:#f0f3f5; --ink:#14202b; --muted:#566473;
+  --line:#d7dde2; --line-strong:#8d99a5;
+  --teal:#0f766e; --teal-soft:#dff3f0;
+  --amber:#b45309; --amber-soft:#fdeed8;
+  --blue:#2749c9; --blue-soft:#e3e9fb;
+  --red:#b42318; --red-soft:#fde7e5;
+  --code-bg:#0f1720; --code-ink:#e6edf3;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1419; --surface:#151d24; --surface-2:#1b252d; --ink:#e7edf2; --muted:#9aa7b3;
+    --line:#2b3741; --line-strong:#6b7986;
+    --teal:#4fd1c5; --teal-soft:#123a38;
+    --amber:#f2b45c; --amber-soft:#3a2a10;
+    --blue:#8fa8ff; --blue-soft:#1c2650;
+    --red:#f28b82; --red-soft:#40201e;
+    --code-bg:#0a0f14; --code-ink:#dbe5ee;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1419; --surface:#151d24; --surface-2:#1b252d; --ink:#e7edf2; --muted:#9aa7b3;
+  --line:#2b3741; --line-strong:#6b7986;
+  --teal:#4fd1c5; --teal-soft:#123a38;
+  --amber:#f2b45c; --amber-soft:#3a2a10;
+  --blue:#8fa8ff; --blue-soft:#1c2650;
+  --red:#f28b82; --red-soft:#40201e;
+  --code-bg:#0a0f14; --code-ink:#dbe5ee;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+header.top{padding:56px 0 28px}
+.kicker{font:600 13px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 14px}
+h1{font-size:clamp(34px,5vw,54px);line-height:1.08;margin:0 0 16px;letter-spacing:-.02em}
+.lede{font-size:clamp(18px,2.2vw,22px);color:var(--muted);max-width:760px;margin:0}
+nav.jump{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);border-top:1px solid var(--line)}
+nav.jump ul{list-style:none;margin:0;padding:10px 0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+nav.jump a{color:var(--muted);text-decoration:none;font-weight:600}
+nav.jump a:hover{color:var(--teal)}
+section{padding:56px 0 8px}
+h2{font-size:clamp(26px,3.4vw,34px);line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+h2 .n{font:600 14px var(--mono);color:var(--muted);display:block;margin-bottom:6px;letter-spacing:.06em}
+h3{font-size:19px;margin:30px 0 8px}
+p{margin:0 0 14px;max-width:820px}
+.answer{font-size:19px;font-weight:600;max-width:820px;margin:10px 0 18px}
+code,kbd{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 6px;border-radius:5px}
+pre{position:relative;background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:16px 18px;overflow-x:auto;font:14px/1.55 var(--mono);margin:12px 0 18px}
+pre code{background:none;padding:0;font-size:inherit;color:inherit}
+pre .cm{color:#8aa0b4}
+.copy{position:absolute;top:8px;right:8px;font:600 12px var(--sans);color:var(--code-ink);background:#ffffff1a;border:1px solid #ffffff33;border-radius:7px;padding:3px 9px;cursor:pointer}
+.copy:hover{background:#ffffff33}
+.grid{display:grid;gap:16px;margin:16px 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.card h3{margin:0 0 6px;font-size:17px}
+.card p{margin:0 0 8px;font-size:16px}
+.card p:last-child{margin:0}
+.analogy{background:var(--surface-2);border-radius:14px;padding:14px 18px;margin:16px 0;max-width:860px}
+.analogy .tag{display:inline-block;font:700 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin-right:8px}
+.fig{margin:22px 0 26px}
+.fig .scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.fig svg{display:block;width:100%;height:auto;min-width:780px}
+.fig figcaption{font-size:15px;color:var(--muted);margin-top:10px;max-width:900px}
+.steps{list-style:none;counter-reset:s;margin:14px 0;padding:0;display:grid;gap:10px;max-width:900px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+.steps li::before{content:counter(s);width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--bg);font:700 14px/30px var(--mono);text-align:center}
+.steps b{display:block}
+.pill{display:inline-block;font:700 12px var(--mono);padding:2px 9px;border-radius:99px;letter-spacing:.04em}
+.pill.demo{background:var(--amber-soft);color:var(--amber)}
+.pill.prod{background:var(--teal-soft);color:var(--teal)}
+.pill.warn{background:var(--red-soft);color:var(--red)}
+.port{font:700 34px/1 var(--mono);color:var(--teal);letter-spacing:-.02em;margin-bottom:8px}
+.port small{font-size:14px;color:var(--muted);font-weight:600;letter-spacing:0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.stat .v{font:700 40px/1.05 var(--mono);color:var(--teal);letter-spacing:-.02em}
+.stat .l{color:var(--muted);font-size:15px;margin-top:6px}
+.beats{list-style:none;margin:16px 0;padding:0;display:grid;gap:14px}
+.beats>li{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px;display:grid;grid-template-columns:110px minmax(0,1fr);gap:14px}
+.beats>li>div{min-width:0}
+.beats .time{font:700 15px var(--mono);color:var(--amber)}
+.beats b{display:block;margin-bottom:4px}
+.beats p{margin:0 0 6px;font-size:16px}
+.beats pre{margin:8px 0 0}
+ul.tight{margin:8px 0 16px;padding-left:22px;max-width:860px}
+ul.tight li{margin:5px 0}
+.limits li::marker{color:var(--red)}
+dl.gloss{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:8px 20px;max-width:900px;margin:14px 0}
+dl.gloss dt{font-weight:700}
+dl.gloss dd{margin:0;color:var(--muted)}
+footer{padding:48px 0 64px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);margin-top:56px}
+/* diagram styling: classes live here because SVG stays free of <style> */
+svg text{fill:var(--ink);font-family:inherit}
+svg .t{font-size:13px}
+svg .tb{font-size:14px;font-weight:700}
+svg .ts{font-size:11.5px;fill:var(--muted)}
+svg .tc{text-anchor:middle}
+svg .tr{text-anchor:end}
+svg .mono{font-family:var(--mono);font-size:11px}
+svg .c-demo{fill:var(--amber)}
+svg .c-prod{fill:var(--teal)}
+svg .c-blue{fill:var(--blue)}
+svg .c-red{fill:var(--red)}
+svg .b{fill:var(--surface);stroke:var(--line-strong);stroke-width:1.5}
+svg .b.demo{fill:var(--amber-soft);stroke:var(--amber)}
+svg .b.prod{fill:var(--teal-soft);stroke:var(--teal)}
+svg .b.blue{fill:var(--blue-soft);stroke:var(--blue)}
+svg .b.dash{fill:none;stroke-dasharray:6 4}
+svg .b.zone{fill:none;stroke-dasharray:3 5;stroke:var(--line-strong)}
+svg .a{fill:none;stroke:var(--ink);stroke-width:1.7}
+svg .a.demo{stroke:var(--amber)}
+svg .a.prod{stroke:var(--teal)}
+svg .a.blue{stroke:var(--blue)}
+svg .a.dash{stroke-dasharray:6 4}
+svg .badge{fill:var(--ink)}
+svg .badge-t{fill:var(--bg);font-size:12px;font-weight:700;text-anchor:middle}
+svg .sw-demo{fill:var(--amber)}
+svg .sw-prod{fill:var(--teal)}
+svg .mk{fill:var(--ink)}
+svg .mk-demo{fill:var(--amber)}
+svg .mk-prod{fill:var(--teal)}
+svg .mk-blue{fill:var(--blue)}
+@media (max-width:700px){
+  .beats>li{grid-template-columns:minmax(0,1fr)}
+  dl.gloss{grid-template-columns:1fr}
+  body{font-size:16px}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+    <marker id="ah-demo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk-demo"/></marker>
+    <marker id="ah-prod" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk-prod"/></marker>
+    <marker id="ah-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="mk-blue"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+<header class="top">
+  <p class="kicker">Universal Log Intelligence · project guide</p>
+  <h1>One log line in.<br>One graded, traceable event out.</h1>
+  <p class="lede">A log pipeline that parses any format, learns formats it has never seen, notices when a format changes, and runs with no internet. Nothing is dropped.</p>
+</header>
+</div>
+
+<nav class="jump" aria-label="Sections"><div class="wrap"><ul>
+  <li><a href="#what">What it does</a></li>
+  <li><a href="#arch">Architecture</a></li>
+  <li><a href="#modes">Demo vs production</a></li>
+  <li><a href="#workers">Workers</a></li>
+  <li><a href="#where">Where logs land</a></li>
+  <li><a href="#ports">Ports</a></li>
+  <li><a href="#redis">Redis</a></li>
+  <li><a href="#tiers">7 tiers</a></li>
+  <li><a href="#drift">Drift</a></li>
+  <li><a href="#numbers">Numbers</a></li>
+  <li><a href="#demo">2-minute demo</a></li>
+  <li><a href="#unique">Unique + limits</a></li>
+  <li><a href="#folders">Folders</a></li>
+  <li><a href="#gloss">Glossary</a></li>
+</ul></div></nav>
+
+<main class="wrap">
+
+<!-- ============ 0 ============ -->
+<section id="what">
+  <h2><span class="n">00</span>What it does</h2>
+  <div class="grid g3">
+    <div class="card"><h3>The problem</h3><p>A pipeline parses a log only after a person writes a parser for that exact format. A new device, or a vendor update that changes one field, gets dropped, stored as raw text, or silently misread.</p></div>
+    <div class="card"><h3>What we built</h3><p>Every log is tried against 7 ladders of increasing effort. Each result carries a <b>tier</b> (which ladder produced it) and a <b>confidence</b> (0 to 1), so consumers filter by trust.</p></div>
+    <div class="card"><h3>The guarantee</h3><p>1 log line in = exactly 1 stored raw record + exactly 1 stored event. No exception, no drop.</p></div>
+  </div>
+  <div class="analogy"><span class="tag">Analogy</span>Airport customs that never refuses entry. Every passenger is admitted. The officer only decides how much they can vouch for, and writes that on the passenger's file.</div>
+</section>
+
+<!-- ============ 1 ARCH ============ -->
+<section id="arch">
+  <h2><span class="n">01</span>Architecture</h2>
+  <p class="answer">A log reaches the API. In demo mode the API parses it. In production the API queues it and workers parse it. Both write to the same two stores.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 1100 590" role="img" aria-label="Logs flow from sources through the collector to the API. In demo mode the API runs the parse engine itself; in production the API queues logs in a Redis stream and workers run the engine. The engine writes the parsed event to a SQL database and the original bytes to a raw store.">
+      <!-- legend -->
+      <rect class="sw-demo" x="16" y="16" width="12" height="12" rx="2"/><text class="ts" x="36" y="26">Demo path · ULI_MODE=local</text>
+      <rect class="sw-prod" x="16" y="36" width="12" height="12" rx="2"/><text class="ts" x="36" y="46">Production path · ULI_MODE=distributed</text>
+
+      <!-- sources -->
+      <rect class="b" x="16" y="70" width="140" height="64" rx="10"/>
+      <text class="tb tc" x="86" y="96">Devices</text><text class="ts tc" x="86" y="114">syslog UDP / TCP</text>
+      <rect class="b" x="16" y="160" width="140" height="64" rx="10"/>
+      <text class="tb tc" x="86" y="186">Log files</text><text class="ts tc" x="86" y="204">tail -F</text>
+      <rect class="b" x="16" y="340" width="140" height="64" rx="10"/>
+      <text class="tb tc" x="86" y="366">inject.sh · curl</text><text class="ts tc" x="86" y="384">HTTP POST</text>
+
+      <!-- collector -->
+      <rect class="b" x="192" y="90" width="130" height="130" rx="10"/>
+      <circle class="badge" cx="192" cy="90" r="11"/><text class="badge-t" x="192" y="94">1</text>
+      <text class="tb tc" x="257" y="118">Collector</text>
+      <text class="ts tc" x="257" y="138">Go · static binary</text>
+      <text class="ts tc mono" x="257" y="156">:5514 udp + tcp</text>
+      <text class="ts tc" x="257" y="174">batch = 200 lines</text>
+      <text class="ts tc" x="257" y="190">or every 500 ms</text>
+
+      <path class="a" d="M156,102 H174 V125 H192" marker-end="url(#ah)"/>
+      <path class="a" d="M156,192 H174 V185 H192" marker-end="url(#ah)"/>
+      <path class="a" d="M322,155 H366" marker-end="url(#ah)"/>
+      <text class="ts tc" x="344" y="173">HTTP</text>
+      <path class="a" d="M156,372 H366" marker-end="url(#ah)"/>
+      <text class="ts tc" x="261" y="364">HTTP POST /v1/ingest</text>
+
+      <!-- API -->
+      <rect class="b" x="366" y="140" width="160" height="290" rx="10"/>
+      <circle class="badge" cx="366" cy="140" r="11"/><text class="badge-t" x="366" y="144">2</text>
+      <text class="tb tc" x="446" y="168">API</text>
+      <text class="ts tc" x="446" y="188">Python · FastAPI</text>
+      <text class="ts tc mono" x="446" y="206">:8080</text>
+      <text class="ts mono" x="380" y="236">POST /v1/ingest</text>
+      <text class="ts mono" x="380" y="254">GET  /v1/events</text>
+      <text class="ts mono" x="380" y="272">GET  /v1/unknown</text>
+      <text class="ts mono" x="380" y="290">GET  /v1/drift</text>
+      <text class="ts mono" x="380" y="308">GET  /docs /health</text>
+      <text class="ts mono" x="380" y="326">GET  /metrics</text>
+      <text class="ts c-demo" x="380" y="372" style="font-weight:700">local: parses inline</text>
+      <text class="ts c-prod" x="380" y="392" style="font-weight:700">distributed: queues</text>
+
+      <!-- demo lane -->
+      <path class="a demo" d="M526,190 H934" marker-end="url(#ah-demo)"/>
+      <text class="ts tc c-demo" x="730" y="180" style="font-weight:700">DEMO: the API runs the engine itself</text>
+
+      <!-- production lane -->
+      <path class="a prod" d="M526,330 H596" marker-end="url(#ah-prod)"/>
+      <text class="ts tc c-prod" x="561" y="322">XADD</text>
+      <rect class="b prod" x="596" y="270" width="100" height="120" rx="10"/>
+      <circle class="badge" cx="596" cy="270" r="11"/><text class="badge-t" x="596" y="274">3</text>
+      <text class="tb tc" x="646" y="298">Redis</text>
+      <text class="ts tc" x="646" y="318">Stream</text>
+      <text class="ts tc mono" x="646" y="336">uli:raw</text>
+      <text class="ts tc mono" x="646" y="354">:6379</text>
+      <text class="ts tc" x="646" y="372">waiting line</text>
+      <path class="a prod" d="M696,330 H780" marker-end="url(#ah-prod)"/>
+      <text class="ts tc c-prod" x="738" y="322">XREADGROUP</text>
+      <rect class="b prod" x="780" y="270" width="110" height="120" rx="10"/>
+      <circle class="badge" cx="780" cy="270" r="11"/><text class="badge-t" x="780" y="274">4</text>
+      <text class="tb tc" x="835" y="298">Workers ×N</text>
+      <text class="ts tc" x="835" y="318">Python</text>
+      <text class="ts tc" x="835" y="336">pull ≤ 200 logs</text>
+      <text class="ts tc" x="835" y="354">then XACK</text>
+      <text class="ts tc" x="835" y="372">no port opened</text>
+      <path class="a prod" d="M890,330 H934" marker-end="url(#ah-prod)"/>
+
+      <!-- engine -->
+      <rect class="b" x="934" y="140" width="150" height="290" rx="10"/>
+      <circle class="badge" cx="934" cy="140" r="11"/><text class="badge-t" x="934" y="144">5</text>
+      <text class="tb tc" x="1009" y="168">Parse engine</text>
+      <text class="ts tc" x="1009" y="188">7-tier ladder</text>
+      <text class="ts" x="950" y="216">1-2  known formats</text>
+      <text class="ts" x="950" y="234">3    field extraction</text>
+      <text class="ts" x="950" y="252">4    Drain3 templates</text>
+      <text class="ts" x="950" y="270">5    similarity</text>
+      <text class="ts" x="950" y="288">6    ML hint (optional)</text>
+      <text class="ts" x="950" y="306">7    quarantine</text>
+      <text class="ts" x="950" y="346">Per log it also runs:</text>
+      <text class="ts" x="950" y="364">drift check</text>
+      <text class="ts" x="950" y="382">unknown clustering</text>
+
+      <!-- storage -->
+      <path class="a" d="M950,430 V455 H795 V480" marker-end="url(#ah)"/>
+      <text class="ts tc" x="872" y="447">parsed event</text>
+      <path class="a" d="M1030,430 V480" marker-end="url(#ah)"/>
+      <text class="ts tr" x="1022" y="459">raw bytes</text>
+      <rect class="b" x="700" y="480" width="190" height="80" rx="10"/>
+      <circle class="badge" cx="700" cy="480" r="11"/><text class="badge-t" x="700" y="484">6</text>
+      <text class="tb tc" x="795" y="506">SQL database</text>
+      <text class="ts tc" x="795" y="524">events · sources · parsers</text>
+      <text class="ts tc mono" x="795" y="542">data/uli.db</text>
+      <rect class="b" x="914" y="480" width="170" height="80" rx="10"/>
+      <circle class="badge" cx="914" cy="480" r="11"/><text class="badge-t" x="914" y="484">6</text>
+      <text class="tb tc" x="999" y="506">Raw store</text>
+      <text class="ts tc" x="999" y="524">original bytes, untouched</text>
+      <text class="ts tc mono" x="999" y="542">data/raw/…/*.ndjson</text>
+    </svg>
+    </div>
+    <figcaption>The engine is one piece of code. It runs inside the API in demo mode and inside each worker in production mode. Storage is identical either way.</figcaption>
+  </figure>
+
+  <ol class="steps">
+    <li><div><b>Collector (Go, port 5514)</b>Receives syslog over UDP and TCP, or tails a file. Groups lines into batches (200 per source, or every 500 ms) and POSTs them to the API. It never parses content and never knows workers exist.</div></li>
+    <li><div><b>API (Python FastAPI, port 8080)</b>The front door for writing and reading. Accepts <code>POST /v1/ingest</code>, serves events, drift, unknown clusters, metrics and the <code>/docs</code> page.</div></li>
+    <li><div><b>Redis Stream</b>A numbered waiting line. Used only in production mode.</div></li>
+    <li><div><b>Workers</b>Python processes that pull logs from the line and run the engine. They open no port. They only call out to Redis.</div></li>
+    <li><div><b>Parse engine</b>Runs the 7-tier ladder on each log, checks drift, records unknown formats, converts the result to the OCSF standard schema.</div></li>
+    <li><div><b>Storage</b>SQL database for parsed events (SQLite in demo, PostgreSQL in production). Raw store for the original bytes, kept forever, addressed by SHA-256.</div></li>
+  </ol>
+  <div class="analogy"><span class="tag">Analogy</span>Collector = mailroom clerk who bundles letters and never reads them. API = front desk. Redis = the numbered ticket line. Workers = cashiers. Engine = the customs officer. Storage = the archive room plus the index cards.</div>
+</section>
+
+<!-- ============ 2 MODES ============ -->
+<section id="modes">
+  <h2><span class="n">02</span>Demo vs production</h2>
+  <p class="answer">Today's demo runs in <span class="pill demo">ULI_MODE=local</span>. Production uses <span class="pill prod">ULI_MODE=distributed</span> and more workers.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 1100 440" role="img" aria-label="Top: in local mode the API parses the log itself and writes to the database while two workers sit idle. Bottom: in distributed mode the API only queues the log; Redis hands each log to exactly one of N workers, and the workers write to the database.">
+      <!-- row 1: demo -->
+      <text class="tb c-demo" x="20" y="26">DEMO · ULI_MODE=local (what you run today)</text>
+      <rect class="b" x="20" y="50" width="150" height="64" rx="10"/>
+      <text class="tb tc" x="95" y="78">inject.sh</text><text class="ts tc" x="95" y="97">or collector</text>
+      <rect class="b demo" x="270" y="40" width="220" height="84" rx="10"/>
+      <text class="tb tc" x="380" y="70">API + engine</text>
+      <text class="ts tc" x="380" y="90">parses the log right here</text>
+      <text class="ts tc" x="380" y="108">one process does everything</text>
+      <rect class="b" x="880" y="50" width="190" height="64" rx="10"/>
+      <text class="tb tc" x="975" y="78">SQL DB + raw files</text><text class="ts tc mono" x="975" y="97">data/</text>
+      <path class="a" d="M170,70 H270" marker-end="url(#ah)"/><text class="ts tc" x="220" y="62">POST</text>
+      <path class="a dash" d="M270,98 H170" marker-end="url(#ah)"/><text class="ts tc" x="220" y="113">event id</text>
+      <path class="a demo" d="M490,82 H880" marker-end="url(#ah-demo)"/>
+      <text class="ts tc c-demo" x="685" y="74">event + raw bytes written directly</text>
+      <rect class="b dash" x="520" y="132" width="300" height="34" rx="8"/>
+      <text class="ts tc" x="670" y="153">Workers ×2 · running, receive nothing</text>
+
+      <!-- row 2: production -->
+      <text class="tb c-prod" x="20" y="236">PRODUCTION · ULI_MODE=distributed</text>
+      <rect class="b prod dash" x="505" y="240" width="340" height="182" rx="12"/>
+      <text class="ts c-prod" x="517" y="258" style="font-weight:700">+2 hops: Redis and workers</text>
+      <rect class="b" x="20" y="294" width="150" height="64" rx="10"/>
+      <text class="tb tc" x="95" y="322">Collector</text><text class="ts tc" x="95" y="341">or any HTTP client</text>
+      <rect class="b prod" x="270" y="284" width="180" height="84" rx="10"/>
+      <text class="tb tc" x="360" y="314">API</text>
+      <text class="ts tc" x="360" y="334">only queues the log</text>
+      <text class="ts tc" x="360" y="352">replies queued: true</text>
+      <rect class="b prod" x="520" y="289" width="130" height="74" rx="10"/>
+      <text class="tb tc" x="585" y="318">Redis Stream</text><text class="ts tc mono" x="585" y="337">uli:raw</text>
+      <rect class="b prod" x="710" y="246" width="120" height="44" rx="10"/><text class="tb tc" x="770" y="264">worker-1</text><text class="ts tc" x="770" y="280">pull ≤ 200</text>
+      <rect class="b prod" x="710" y="304" width="120" height="44" rx="10"/><text class="tb tc" x="770" y="322">worker-2</text><text class="ts tc" x="770" y="338">pull ≤ 200</text>
+      <rect class="b prod" x="710" y="362" width="120" height="44" rx="10"/><text class="tb tc" x="770" y="380">worker-N</text><text class="ts tc" x="770" y="396">pull ≤ 200</text>
+      <rect class="b" x="880" y="291" width="190" height="70" rx="10"/>
+      <text class="tb tc" x="975" y="320">SQL DB + raw files</text><text class="ts tc mono" x="975" y="339">data/</text>
+      <path class="a" d="M170,312 H270" marker-end="url(#ah)"/><text class="ts tc" x="220" y="304">POST</text>
+      <path class="a dash" d="M270,340 H170" marker-end="url(#ah)"/><text class="ts tc" x="220" y="355">queued: true</text>
+      <path class="a prod" d="M450,326 H520" marker-end="url(#ah-prod)"/><text class="ts tc c-prod" x="485" y="318">XADD</text>
+      <path class="a prod" d="M650,326 L710,268" marker-end="url(#ah-prod)"/>
+      <path class="a prod" d="M650,326 H710" marker-end="url(#ah-prod)"/>
+      <path class="a prod" d="M650,326 L710,384" marker-end="url(#ah-prod)"/>
+      <text class="ts tc c-prod" x="585" y="396">one log → one worker</text>
+      <path class="a prod" d="M830,268 L880,308" marker-end="url(#ah-prod)"/>
+      <path class="a prod" d="M830,326 H880" marker-end="url(#ah-prod)"/>
+      <path class="a prod" d="M830,384 L880,344" marker-end="url(#ah-prod)"/>
+    </svg>
+    </div>
+    <figcaption>The difference between the two modes is the added Redis line and the N workers between the API and the database. Everything else is the same.</figcaption>
+  </figure>
+
+  <div class="grid g2">
+    <div class="card"><h3><span class="pill demo">DEMO</span> what is toggled now</h3>
+      <p><code>docker-compose.yml</code> line 27: the <code>api</code> service has <code>ULI_MODE: local</code>.</p>
+      <p>The API parses inline, so <code>inject.sh</code> prints the tier instantly. The 2 workers run and stay idle.</p></div>
+    <div class="card"><h3><span class="pill prod">PRODUCTION</span> what changes</h3>
+      <p>Set <code>ULI_MODE: distributed</code> on the <code>api</code> service. The API queues every log and replies <code>queued: true</code>. Workers parse.</p>
+      <p>Kubernetes manifests already use <code>distributed</code> for both API and workers.</p></div>
+  </div>
+
+  <h3>Commands</h3>
+  <pre><code><span class="cm"># demo: what you run today</span>
+docker compose up -d
+
+<span class="cm"># production on Docker Compose: set ULI_MODE: distributed under the api service, then</span>
+docker compose up -d --scale worker=8
+
+<span class="cm"># production on Kubernetes (API already distributed)</span>
+kubectl scale deployment uli-worker --replicas=8 -n uli
+
+<span class="cm"># see how many workers run</span>
+docker compose ps</code></pre>
+  <p>In distributed mode <code>inject.sh</code> prints an error line, because the API returns no event id yet. The log is still queued and a worker parses it. Read the result from <code>GET /v1/events</code>.</p>
+</section>
+
+<!-- ============ 3 WORKERS ============ -->
+<section id="workers">
+  <h2><span class="n">03</span>Who gives each worker its logs?</h2>
+  <p class="answer">Nobody assigns them. The collector never talks to workers. Workers pull, and Redis hands each log to exactly one worker.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 80 1100 250" role="img" aria-label="The API appends logs to a Redis stream. Worker-1 pulled logs 1 to 4, worker-2 pulled logs 5 to 8, and logs 9 and 10 are unread until a worker asks for the next batch.">
+      <rect class="b" x="16" y="110" width="120" height="64" rx="10"/>
+      <text class="tb tc" x="76" y="138">API</text><text class="ts tc" x="76" y="157">appends 1 log</text>
+      <path class="a prod" d="M136,142 H190" marker-end="url(#ah-prod)"/><text class="ts tc c-prod" x="163" y="134">XADD</text>
+      <text class="ts" x="190" y="96">stream <tspan class="mono">uli:raw</tspan> · one numbered line of logs, newest at the right</text>
+
+      <rect class="b prod" x="190" y="118" width="74" height="48" rx="8"/><text class="t tc" x="227" y="147">log 1</text>
+      <rect class="b prod" x="270" y="118" width="74" height="48" rx="8"/><text class="t tc" x="307" y="147">log 2</text>
+      <rect class="b prod" x="350" y="118" width="74" height="48" rx="8"/><text class="t tc" x="387" y="147">log 3</text>
+      <rect class="b prod" x="430" y="118" width="74" height="48" rx="8"/><text class="t tc" x="467" y="147">log 4</text>
+      <rect class="b blue" x="510" y="118" width="74" height="48" rx="8"/><text class="t tc" x="547" y="147">log 5</text>
+      <rect class="b blue" x="590" y="118" width="74" height="48" rx="8"/><text class="t tc" x="627" y="147">log 6</text>
+      <rect class="b blue" x="670" y="118" width="74" height="48" rx="8"/><text class="t tc" x="707" y="147">log 7</text>
+      <rect class="b blue" x="750" y="118" width="74" height="48" rx="8"/><text class="t tc" x="787" y="147">log 8</text>
+      <rect class="b dash" x="830" y="118" width="74" height="48" rx="8"/><text class="t tc" x="867" y="147">log 9</text>
+      <rect class="b dash" x="910" y="118" width="74" height="48" rx="8"/><text class="t tc" x="947" y="147">log 10</text>
+
+      <path class="a prod" d="M190,178 V184 H504 V178"/>
+      <path class="a blue" d="M510,178 V184 H824 V178"/>
+      <path class="a" style="stroke-dasharray:4 4" d="M830,178 V184 H984 V178"/>
+      <text class="ts tc" x="907" y="204">unread: the next worker</text>
+      <text class="ts tc" x="907" y="220">to ask gets these</text>
+
+      <path class="a prod" d="M347,184 V236" marker-end="url(#ah-prod)"/><text class="ts c-prod" x="356" y="214">XREADGROUP (up to 200)</text>
+      <path class="a blue" d="M667,184 V236" marker-end="url(#ah-blue)"/><text class="ts c-blue" x="676" y="214">XREADGROUP (up to 200)</text>
+
+      <rect class="b prod" x="248" y="236" width="200" height="76" rx="10"/>
+      <text class="tb tc" x="348" y="262">worker-1</text><text class="ts tc" x="348" y="281">took logs 1 to 4</text><text class="ts tc" x="348" y="298">stores them, then XACK</text>
+      <rect class="b blue" x="568" y="236" width="200" height="76" rx="10"/>
+      <text class="tb tc" x="668" y="262">worker-2</text><text class="ts tc" x="668" y="281">took logs 5 to 8</text><text class="ts tc" x="668" y="298">stores them, then XACK</text>
+    </svg>
+    </div>
+    <figcaption>Consumer group <code>uli-workers</code>: every log is delivered to exactly one consumer. A worker that asks more often gets more logs; there is no fixed split.</figcaption>
+  </figure>
+
+  <div class="analogy"><span class="tag">Analogy</span>A bakery with one numbered ticket line and several cashiers. A cashier calls "next!" when free. The line never chooses a cashier.</div>
+
+  <ul class="tight">
+    <li><b>Pull, not push.</b> A worker asks Redis for the next batch (<code>XREADGROUP</code>, up to 200 logs, waits 1 second if none). Redis marks those logs "in flight" for that worker.</li>
+    <li><b>Done = XACK.</b> The worker stores the events, then acknowledges. Unacknowledged logs stay in flight.</li>
+    <li><b>Crash recovery.</b> When a worker restarts under the same name, it re-reads its own in-flight logs first.</li>
+    <li><b>Proof we ran.</b> 40 tagged logs sent in distributed mode. Redis showed 2 separate consumers, both at 0 pending. The events table grew by exactly 40: none lost, none duplicated.</li>
+  </ul>
+  <p><span class="pill warn">LIMIT</span> No other worker takes over a dead worker's in-flight logs (no <code>XAUTOCLAIM</code>). A container recreated under a new name leaves its in-flight logs orphaned.</p>
+</section>
+
+<!-- ============ 4 WHERE ============ -->
+<section id="where">
+  <h2><span class="n">04</span>After you paste a log in inject.sh, where is it?</h2>
+  <p class="answer">Yes, in the database: <code>data/uli.db</code>, table <code>events</code>. The original bytes are in <code>data/raw/</code>.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 1100 300" role="img" aria-label="One pasted line goes through the API and engine and becomes up to four stored things: a row in the events table, a row in raw_index pointing at the original bytes, the raw bytes in an ndjson file, and, only for tier 4 or worse, an unknown_clusters row.">
+      <rect class="b" x="16" y="100" width="170" height="80" rx="10"/>
+      <text class="tb tc" x="101" y="128">inject.sh</text><text class="ts tc" x="101" y="147">you paste one line</text><text class="ts tc" x="101" y="164">prints tier · confidence</text>
+      <rect class="b" x="246" y="110" width="120" height="60" rx="10"/>
+      <text class="tb tc" x="306" y="136">API</text><text class="ts tc mono" x="306" y="154">POST /v1/ingest</text>
+      <rect class="b" x="426" y="110" width="130" height="60" rx="10"/>
+      <text class="tb tc" x="491" y="136">Engine</text><text class="ts tc" x="491" y="154">7-tier ladder</text>
+      <path class="a" d="M186,140 H246" marker-end="url(#ah)"/><text class="ts tc" x="216" y="132">POST</text>
+      <path class="a" d="M366,140 H426" marker-end="url(#ah)"/>
+      <path class="a dash" d="M306,170 V216 H101 V180" marker-end="url(#ah)"/>
+      <text class="ts" x="24" y="236">event id comes back; inject.sh fetches the event and prints tier, confidence, parser</text>
+
+      <path class="a" d="M556,140 H610"/>
+      <path class="a" d="M610,40 V244"/>
+      <path class="a" d="M610,40 H690" marker-end="url(#ah)"/>
+      <path class="a" d="M610,108 H690" marker-end="url(#ah)"/>
+      <path class="a" d="M610,176 H690" marker-end="url(#ah)"/>
+      <path class="a dash" d="M610,244 H690" marker-end="url(#ah)"/>
+
+      <rect class="b prod" x="690" y="14" width="390" height="52" rx="10"/>
+      <text class="tb" x="704" y="36">events table · the parsed log</text>
+      <text class="ts" x="704" y="55">tier, confidence, parser_id, message, full OCSF body</text>
+      <rect class="b" x="690" y="82" width="390" height="52" rx="10"/>
+      <text class="tb" x="704" y="104">raw_index table · the pointer</text>
+      <text class="ts" x="704" y="123">raw_event_id → file segment, offset, length</text>
+      <rect class="b" x="690" y="150" width="390" height="52" rx="10"/>
+      <text class="tb" x="704" y="172">raw file · the original bytes</text>
+      <text class="ts mono" x="704" y="191">data/raw/default/&lt;source&gt;/&lt;date&gt;/000001.ndjson</text>
+      <rect class="b dash" x="690" y="218" width="390" height="52" rx="10"/>
+      <text class="tb" x="704" y="240">unknown_clusters table · only when tier ≥ 4</text>
+      <text class="ts" x="704" y="259">groups look-alike unknown lines for human approval</text>
+    </svg>
+    </div>
+    <figcaption>One pasted line produces three stored records, plus a fourth if the engine could not recognize its format.</figcaption>
+  </figure>
+
+  <div class="grid g2">
+    <div class="card"><h3>1 · Your terminal (instant)</h3><p><code>inject.sh</code> prints <code>tier</code>, <code>confidence</code>, <code>parser</code> and the message.</p></div>
+    <div class="card"><h3>2 · The database file</h3><p>Open <code>data/uli.db</code> with the VS Code "SQLite Viewer" extension. Table <code>events</code>: <code>event_id, source_id, tier, confidence, parser_id, message, body</code>. <code>body</code> is the full OCSF JSON.</p></div>
+    <div class="card"><h3>3 · The API</h3><p>Filter by your source: <code>GET /v1/events?source_id=vscode-demo</code>. One event with its full OCSF JSON: <code>GET /v1/events/&lt;event_id&gt;</code>. Commands below.</p></div>
+    <div class="card"><h3>4 · The browser</h3><p>Open <code>http://localhost:8080/docs</code>. Click <code>GET /v1/events</code>, then "Try it out".</p></div>
+    <div class="card"><h3>5 · The original bytes</h3><p><code>GET /v1/raw/&lt;raw_event_id&gt;</code> returns the exact line and a SHA-256 check. Or open the file under <code>data/raw/default/&lt;source&gt;/&lt;date&gt;/</code>.</p></div>
+    <div class="card"><h3>6 · Unrecognized lines</h3><p>Tier 4 and worse also appear in table <code>unknown_clusters</code> and at <code>GET /v1/unknown</code>.</p></div>
+  </div>
+<pre><code>curl -s "localhost:8080/v1/events?source_id=vscode-demo" | jq '.[] | {tier: .provenance.tier, confidence: .provenance.confidence, parser: .provenance.parser_id, message}'
+curl -s localhost:8080/v1/events/&lt;event_id&gt; | jq</code></pre>
+</section>
+
+<!-- ============ 5 PORTS ============ -->
+<section id="ports">
+  <h2><span class="n">05</span>The API and ports</h2>
+  <p class="answer">Two doors face the outside: 8080 (HTTP) and 5514 (syslog). Everything else stays inside the Docker network.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 1100 400" role="img" aria-label="Devices reach the collector on port 5514. Terminals and browsers reach the API on port 8080. Inside the Docker network the collector calls the API on 8080, the API and workers call Redis on 6379, and the API calls the optional ML sidecar on 8090 only when ML is enabled.">
+      <rect class="b zone" x="200" y="20" width="880" height="360" rx="16"/>
+      <text class="ts" x="216" y="44">Docker network uli_default · container names work as hostnames: api, redis, ml</text>
+
+      <rect class="b" x="10" y="60" width="150" height="64" rx="10"/>
+      <text class="tb tc" x="85" y="88">Devices</text><text class="ts tc" x="85" y="106">firewalls, servers</text>
+      <rect class="b" x="10" y="190" width="150" height="64" rx="10"/>
+      <text class="tb tc" x="85" y="218">Terminal · browser</text><text class="ts tc" x="85" y="236">inject.sh · curl</text>
+
+      <rect class="b" x="290" y="60" width="150" height="64" rx="10"/>
+      <text class="tb tc" x="365" y="88">Collector</text><text class="ts tc mono" x="365" y="106">:5514 udp + tcp</text>
+      <path class="a" d="M160,92 H290" marker-end="url(#ah)"/>
+      <text class="ts c-demo" x="208" y="84" style="font-weight:700">5514 udp+tcp</text>
+
+      <rect class="b" x="540" y="170" width="150" height="100" rx="10"/>
+      <text class="tb tc" x="615" y="198">API</text><text class="ts tc" x="615" y="218">FastAPI</text><text class="ts tc mono" x="615" y="236">api:8080</text><text class="ts tc" x="615" y="254">the only log door</text>
+      <path class="a" d="M160,222 H540" marker-end="url(#ah)"/>
+      <text class="ts c-demo" x="208" y="214" style="font-weight:700">8080 · POST /v1/ingest · GET /docs · /metrics</text>
+      <path class="a" d="M440,92 H615 V170" marker-end="url(#ah)"/>
+      <text class="ts tc" x="527" y="84">HTTP → api:8080</text>
+
+      <rect class="b prod" x="800" y="170" width="150" height="100" rx="10"/>
+      <text class="tb tc" x="875" y="198">Redis</text><text class="ts tc" x="875" y="218">queue only</text><text class="ts tc mono" x="875" y="236">redis:6379</text><text class="ts tc" x="875" y="254">also published on host</text>
+      <path class="a prod" d="M690,222 H800" marker-end="url(#ah-prod)"/>
+      <text class="ts tc c-prod" x="745" y="214">redis:6379</text><text class="ts tc c-prod" x="745" y="240">distributed only</text>
+
+      <rect class="b prod" x="800" y="300" width="150" height="60" rx="10"/>
+      <text class="tb tc" x="875" y="326">Workers ×N</text><text class="ts tc" x="875" y="344">no port · call out only</text>
+      <path class="a prod" d="M875,300 V270" marker-end="url(#ah-prod)"/>
+      <text class="ts c-prod" x="885" y="290">redis:6379</text>
+
+      <rect class="b dash" x="540" y="300" width="150" height="60" rx="10"/>
+      <text class="tb tc" x="615" y="326">ML sidecar</text><text class="ts tc mono" x="615" y="344">ml:8090 · optional</text>
+      <path class="a dash" d="M615,270 V300" marker-end="url(#ah)"/>
+      <text class="ts" x="625" y="290">only if ULI_ML_ENABLED</text>
+    </svg>
+    </div>
+    <figcaption>Amber labels are the two ports that face outside. Redis is also published on the host for debugging; close it in production.</figcaption>
+  </figure>
+
+  <div class="grid g4 ports">
+    <div class="card"><div class="port">8080</div><b>API · HTTP</b><p>Write: <code>POST /v1/ingest</code>. Read: <code>/v1/events</code>, <code>/v1/sources</code>, <code>/v1/unknown</code>, <code>/v1/drift</code>, <code>/v1/parsers</code>, <code>/v1/stats</code>. Ops: <code>/health</code>, <code>/metrics</code>, <code>/docs</code>.</p></div>
+    <div class="card"><div class="port">5514 <small>udp+tcp</small></div><b>Collector · syslog in</b><p>Only started with <code>--profile collector</code>. TCP handles octet-counted and newline framing.</p></div>
+    <div class="card"><div class="port">6379</div><b>Redis · queue</b><p>API (distributed mode) and workers connect here. Nothing else needs it.</p></div>
+    <div class="card"><div class="port">8090</div><b>ML sidecar</b><p>Optional. Off by default. Only <code>--profile ml</code> starts it.</p></div>
+  </div>
+  <div class="analogy"><span class="tag">Analogy</span>One building. A front door (8080), a mail slot (5514), and a staff corridor (the Docker network) where the cashiers walk to the ticket line (6379).</div>
+</section>
+
+<!-- ============ 6 REDIS ============ -->
+<section id="redis">
+  <h2><span class="n">06</span>Redis and Redis Streams</h2>
+  <p class="answer">Redis is an in-memory database. Here it is only the waiting line between the API and the workers. It stores no results.</p>
+  <div class="analogy"><span class="tag">Analogy</span>Redis is the whiteboard at the bakery. A Stream is the numbered ticket roll pinned to it: tickets are added at the end, each has an increasing id, and nothing is erased when a cashier takes one.</div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Where it is "installed"</h3><p>Nowhere separate. Streams are a built-in Redis feature. The <code>redis</code> service in <code>docker-compose.yml</code> runs the stock <code>redis:7-alpine</code> image. Our code in <code>uli/ingestion/queue.py</code> (<code>RedisStreamsQueue</code>) calls its stream commands.</p></div>
+    <div class="card"><h3>Our settings</h3>
+      <p>Stream <code>uli:raw</code> · group <code>uli-workers</code></p>
+      <p>Cap ≈ 1,000,000 entries (<code>stream_maxlen</code>)</p>
+      <p>Batch 200 · wait 1000 ms</p>
+      <p>Fallback: if Redis is unreachable, an in-process memory queue is used (single process only).</p></div>
+  </div>
+
+  <h3>The four commands we use</h3>
+  <pre><code><span class="cm"># once: create the shared group (and the stream if missing)</span>
+XGROUP CREATE uli:raw uli-workers 0 MKSTREAM
+
+<span class="cm"># API, per log: append the log envelope; trim to ~1,000,000</span>
+XADD uli:raw MAXLEN ~ 1000000 * e '{...json envelope...}'
+
+<span class="cm"># worker, in a loop: take up to 200 unread logs, wait up to 1 s</span>
+XREADGROUP GROUP uli-workers &lt;worker-name&gt; COUNT 200 BLOCK 1000 STREAMS uli:raw &gt;
+
+<span class="cm"># worker, after storing the events: confirm</span>
+XACK uli:raw uli-workers &lt;id&gt; &lt;id&gt; ...</code></pre>
+
+  <h3>Check it yourself</h3>
+  <pre><code>docker exec uli-redis-1 redis-cli XLEN uli:raw
+docker exec uli-redis-1 redis-cli XINFO GROUPS uli:raw
+docker exec uli-redis-1 redis-cli XINFO CONSUMERS uli:raw uli-workers</code></pre>
+  <ul class="tight limits">
+    <li><span class="pill warn">LIMIT</span> Redis runs with persistence off (<code>--save "" --appendonly no</code>). A Redis restart loses logs still waiting in the stream. Production fix: <code>--appendonly yes</code>.</li>
+    <li><code>depth</code> in <code>/health</code> is the stream length, not the backlog. Acknowledged entries stay until trimmed.</li>
+  </ul>
+</section>
+
+<!-- ============ 7 TIERS ============ -->
+<section id="tiers">
+  <h2><span class="n">07</span>The 7 tiers</h2>
+  <p class="answer">A cascade, not a checklist. A clean log stops after tiers 1-3. Only weak results fall further.</p>
+
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 1100 720" role="img" aria-label="A log first goes through tier 1-2 known parsers and tier 3 field extraction. If confidence is at least 0.6 the event is stored. Otherwise it falls to tier 4 Drain3 template mining, tier 5 similarity to known parsers, tier 6 optional ML hint, and tier 7 quarantine, then is stored with tier 4 or 7.">
+      <rect class="b" x="120" y="10" width="400" height="36" rx="18"/>
+      <text class="tb tc" x="320" y="33">One log line arrives</text>
+      <path class="a" d="M320,46 V72" marker-end="url(#ah)"/>
+
+      <rect class="b prod" x="120" y="72" width="400" height="64" rx="10"/>
+      <text class="tb tc" x="320" y="98">Tier 1-2 · try the known parsers</text>
+      <text class="ts tc" x="320" y="118">built-in formats + vendor packs, best match wins</text>
+      <path class="a" d="M320,136 V166" marker-end="url(#ah)"/>
+
+      <rect class="b prod" x="120" y="166" width="400" height="56" rx="10"/>
+      <text class="tb tc" x="320" y="191">Tier 3 · extract fields (always runs)</text>
+      <text class="ts tc" x="320" y="210">IPs, users, ports, timestamp, key=value</text>
+      <path class="a" d="M320,222 V256" marker-end="url(#ah)"/>
+
+      <polygon class="b" points="320,256 450,306 320,356 190,306"/>
+      <text class="ts tc" x="320" y="303" style="font-size:12.5px">confidence</text>
+      <text class="tb tc" x="320" y="322" style="font-size:13px">≥ 0.6 ?</text>
+      <path class="a prod" d="M450,306 H600" marker-end="url(#ah-prod)"/>
+      <text class="ts tc c-prod" x="525" y="298" style="font-weight:700">yes</text>
+      <rect class="b prod" x="600" y="288" width="260" height="36" rx="18"/>
+      <text class="tb tc" x="730" y="311">Done · store the event</text>
+      <path class="a" d="M320,356 V388" marker-end="url(#ah)"/>
+      <text class="ts" x="332" y="376" style="font-weight:700">no</text>
+
+      <rect class="b" x="120" y="388" width="400" height="56" rx="10"/>
+      <text class="tb tc" x="320" y="413">Tier 4 · Drain3 template mining</text>
+      <text class="ts tc" x="320" y="432">groups it with look-alike lines from the same source</text>
+      <path class="a" d="M320,444 V474" marker-end="url(#ah)"/>
+
+      <rect class="b" x="120" y="474" width="400" height="56" rx="10"/>
+      <text class="tb tc" x="320" y="499">Tier 5 · similar to a known parser?</text>
+      <text class="ts tc" x="320" y="518">borrow that parser, scale confidence by similarity</text>
+      <path class="a" d="M320,530 V560" marker-end="url(#ah)"/>
+
+      <rect class="b dash" x="120" y="560" width="400" height="56" rx="10"/>
+      <text class="tb tc" x="320" y="585">Tier 6 · ML hint (optional, off)</text>
+      <text class="ts tc" x="320" y="604">annotates only, never changes the decision</text>
+      <path class="a" d="M320,616 V646" marker-end="url(#ah)"/>
+
+      <rect class="b" x="120" y="646" width="400" height="56" rx="10"/>
+      <text class="tb tc" x="320" y="671">Tier 7 · quarantine</text>
+      <text class="ts tc" x="320" y="690">confidence &lt; 0.4: stored, grouped with other unknowns</text>
+      <path class="a" d="M520,674 H600" marker-end="url(#ah)"/>
+      <rect class="b" x="600" y="656" width="260" height="36" rx="18"/>
+      <text class="tb tc" x="730" y="679">Store the event (tier 4 or 7)</text>
+
+      <text class="ts" x="600" y="94">Your journalctl lines (syslog shape): tier 1.</text>
+      <text class="ts" x="600" y="112">Squid, Zeek, pfSense lines: tier 2.</text>
+      <text class="ts" x="600" y="192">Runs on every log. Never the end on its own.</text>
+      <text class="ts" x="600" y="410">uvicorn INFO lines, unknown gadgets: tier 4, confidence 0.5.</text>
+      <text class="ts" x="600" y="428">0.5 is under 0.6, so tiers 5-7 are tried; none improves it.</text>
+      <text class="ts" x="600" y="500">Helps only when the shape resembles a vendor pack.</text>
+      <text class="ts" x="600" y="586">Turn on with ULI_ML_ENABLED=true.</text>
+    </svg>
+    </div>
+    <figcaption>Where the lines you pasted landed: journalctl in tier 1, Squid in tier 2, uvicorn text and invented gadgets in tier 4.</figcaption>
+  </figure>
+
+  <div class="grid g2">
+    <div class="card"><h3>Drain3 is not machine learning</h3><p>It is a deterministic clustering algorithm. It sorts lines by token count, walks a fixed-depth tree on the first tokens, and merges a line into a template when 40% or more of the tokens match. Differing tokens become <code>&lt;*&gt;</code>. No training data, no weights. We mask IPs, numbers and timestamps first so grouping is stable. One tree per source.</p></div>
+    <div class="card"><h3>The only real ML</h3><p>Tier 6 only, optional. Isolation Forest scores outliers. Nearest Centroid guesses the closest vendor shape. Both train live in milliseconds on local traffic. No GPU, no download. They annotate; they never decide.</p></div>
+  </div>
+  <div class="analogy"><span class="tag">Analogy</span>Customs again. Tier 1: "your passport has a valid layout." Tier 2: "I have your country's exact rulebook." Tier 3: "I check your bag whoever you are." Tier 4: "I have never seen this passport, but 50 like it came through today." Tier 7: "Unknown. Admitted, tagged, and flagged for a supervisor."</div>
+</section>
+
+<!-- ============ 8 DRIFT ============ -->
+<section id="drift">
+  <h2><span class="n">08</span>How drift is detected</h2>
+  <p class="answer">Two detectors and one link. Format drift watches the logs. Infrastructure drift watches the machine. The link says if one explains the other.</p>
+  <div class="grid g3">
+    <div class="card"><h3>Format drift</h3>
+      <ol class="steps">
+        <li><div>Per source and parser, collect a window: 200 logs or 60 seconds.</div></li>
+        <li><div>Count the shape fingerprints in the window. Compare with the reference window using Jensen-Shannon divergence.</div></li>
+        <li><div>Above 0.25, or average confidence down by more than 0.15, in 2 windows in a row: fire a drift event. The source is marked degraded.</div></li>
+      </ol>
+      <p>One odd window is ignored. Stored in <code>parser_drift_events</code>.</p></div>
+    <div class="card"><h3>Infrastructure drift</h3>
+      <ol class="steps">
+        <li><div>Every 30 seconds each worker reads <code>deployment/desired-state.yaml</code>.</div></li>
+        <li><div>It compares with the real CPU count, memory, container image IDs and <code>ULI_*</code> variables.</div></li>
+        <li><div>Any mismatch becomes a row in <code>drift_events</code>, with a pointer to the snapshot.</div></li>
+      </ol>
+      <p>An empty file means no checks and no false alarms.</p></div>
+    <div class="card"><h3>The link</h3>
+      <p>When format drift fires, we look back 900 seconds. Any infrastructure drift in that window is listed in <code>explained_by</code>.</p>
+      <p>Repair: Needleman-Wunsch aligns the old template against the new one and carries field labels across. Today that runs on demand for known parsers.</p></div>
+  </div>
+  <div class="analogy"><span class="tag">Analogy</span>Format drift: a colleague changed their handwriting. Infrastructure drift: the office changed its locks. The link is the detective asking whether the two happened the same afternoon.</div>
+
+  <h3>Live proof, one command</h3>
+  <p>Sends 400 logs of one JSON shape, then 400 of another, all parsed by the same parser. Expect <code>js_divergence: 1.0</code>.</p>
+  <pre><code>SRC=drift-$RANDOM
+for shape in A A B B; do
+python3 - "$shape" "$SRC" &lt;&lt;'PY' | curl -s -X POST localhost:8080/v1/ingest -H 'Content-Type: application/json' -d @- &gt;/dev/null
+import json, sys
+shape, src = sys.argv[1], sys.argv[2]
+if shape == "A":
+    mk = lambda i: {"level": "info", "msg": "request completed", "host": f"h{i%5}", "status": 200}
+else:
+    mk = lambda i: {"level": "warn", "event": "disk_pressure", "node": f"n{i%5}", "pct_used": 92, "threshold": 90, "mount": "/data"}
+print(json.dumps({"source_id": src, "lines": [json.dumps(mk(i)) for i in range(200)]}))
+PY
+done
+curl -s localhost:8080/v1/drift/parsers | jq --arg s "$SRC" '[.[] | select(.source_id==$s)][0] | {source_id, parser_id, js_divergence, reason}'</code></pre>
+  <p>Infrastructure drift proof: uncomment <code>cpu_count: 999999</code> in <code>deployment/desired-state.yaml</code>, run <code>docker compose restart api worker</code>, wait 30 seconds, then <code>curl -s "localhost:8080/v1/drift?kind=cpu" | jq</code>. It reports desired 999999, observed 10 (your CPU count). Re-comment the line afterwards.</p>
+</section>
+
+<!-- ============ 9 NUMBERS ============ -->
+<section id="numbers">
+  <h2><span class="n">09</span>Numbers</h2>
+  <p class="answer">One worker parses about 500 logs per second. Measured, not estimated.</p>
+  <div class="stats">
+    <div class="stat"><div class="v">~500</div><div class="l">logs per second per worker (485 to 555 across runs)</div></div>
+    <div class="stat"><div class="v">~2 ms</div><div class="l">per log inside a batch; 4-5 ms for a log sent alone</div></div>
+    <div class="stat"><div class="v">495</div><div class="l">logs per second across 1,000 mixed sources</div></div>
+    <div class="stat"><div class="v">200</div><div class="l">logs per batch, per pull</div></div>
+    <div class="stat"><div class="v">1M</div><div class="l">entries the Redis line holds before trimming</div></div>
+    <div class="stat"><div class="v">~23 d</div><div class="l">for 1 billion logs on one worker: add workers</div></div>
+  </div>
+  <p>Measured on a 10-logical-CPU laptop, SQLite, batches of 200, up to 100,000 logs. Batching the database writes made it 2.6× faster than the earlier per-log writes (~210 logs per second).</p>
+  <ul class="tight">
+    <li><b>Sources:</b> no cap in the code. 1,000 distinct sources tested with exact per-source counts.</li>
+    <li><b>Scale:</b> more workers, each pulling its own slice of the Redis line. Then PostgreSQL instead of SQLite.</li>
+    <li><b>Not measured:</b> throughput with N workers, and runs above 100,000 logs. Linear scaling is the design, not a measured result.</li>
+  </ul>
+  <div class="analogy"><span class="tag">Analogy</span>One cashier scans about 500 items a second. Ten cashiers on the same line are designed for about 5,000, but we have timed only one.</div>
+</section>
+
+<!-- ============ 10 DEMO ============ -->
+<section id="demo">
+  <h2><span class="n">10</span>The 2-minute demo</h2>
+  <p class="answer">Five beats. Everything runs in demo mode.</p>
+
+  <h3>Before you press record</h3>
+  <pre><code>docker compose --profile collector up -d --build
+curl -s localhost:8080/health | jq
+<span class="cm"># full reset if needed: the data/ folder is a bind mount, so -v does not clear it</span>
+docker compose down &amp;&amp; sudo rm -rf data &amp;&amp; mkdir -m 777 data &amp;&amp; docker compose --profile collector up -d</code></pre>
+
+  <ol class="beats">
+    <li><span class="time">0:00 – 0:10</span><div><b>The stack is up</b><p>Say: "API, Redis, two workers and a collector, all containers."</p><pre><code>docker compose ps</code></pre></div></li>
+    <li><span class="time">0:10 – 0:50</span><div><b>Paste five logs into inject.sh</b><p>Run <code>scripts/inject.sh</code>. Paste one line, press Enter, read the tier aloud. Press Ctrl+D at the end. Say the last one is invented on the spot.</p>
+<pre><code>Jun 14 15:16:01 web1 sshd[1234]: Failed password for root from 1.2.3.4 port 4444 ssh2
+{"level":"error","msg":"disk full","host":"db1"}
+CEF:0|Vendor|Product|1.0|100|Login Success|3|src=10.0.0.1 dst=10.0.0.2 spt=1234
+1157689312.049   5006 10.105.21.199 TCP_MISS/200 19763 CONNECT login.yahoo.com:443 badeyek DIRECT/209.73.177.115 -
+TOTALLYFAKEDEVICE-XJ9 status weird code 7 flavor purple</code></pre>
+      <p>Expect tier 1, tier 1, tier 1, tier 2, tier 4. Optional real-world variant: <code>printf '&lt;134&gt;Sep 21 10:00:00 fw01 sshd[42]: Failed password for root from 203.0.113.9 port 22 ssh2' | nc -u -w1 localhost 5514</code></p></div></li>
+    <li><span class="time">0:50 – 1:10</span><div><b>Show it is stored</b><p>Open <code>data/uli.db</code> in the SQLite Viewer. Table <code>events</code>: 5 new rows. Table <code>unknown_clusters</code>: the invented device. Say: "The original bytes are in <code>data/raw/</code>, pointed to by <code>raw_index</code>."</p></div></li>
+    <li><span class="time">1:10 – 1:40</span><div><b>Drift</b><p>Run the drift command from section 08. Show <code>js_divergence: 1.0</code>. Say: "Same parser, different shape. Drift detected, with evidence."</p></div></li>
+    <li><span class="time">1:40 – 2:00</span><div><b>Close</b><p>Say: "Nothing dropped. No internet needed. Parsers repaired without AI. Infrastructure changes linked to format changes. To scale, add workers."</p><pre><code>docker compose up -d --scale worker=8</code></pre></div></li>
+  </ol>
+
+  <h3>Run from scratch</h3>
+  <pre><code>docker compose up -d --build          <span class="cm"># builds uli-api and uli-worker; pulls redis</span>
+docker compose --profile collector up -d --build   <span class="cm"># adds the Go collector image</span>
+make demo                             <span class="cm"># scripts/demo.py: 6 narrated scenarios</span>
+.venv/bin/python scripts/demo_multi_vendor.py      <span class="cm"># 12 real datasets, one table</span>
+scripts/inject.sh                     <span class="cm"># paste any log line</span></code></pre>
+  <p>Images: 4 are built from this repo (<code>uli-api</code>, <code>uli-worker</code>, <code>uli-collector</code>, and <code>uli-ml</code>, the last only with <code>--profile ml</code>). Redis is the only image pulled. Each Dockerfile is two-stage: install dependencies in a throwaway builder stage, copy only the result into a fresh non-root runtime image. No public registry exists; on an offline site, ship the images with <code>deployment/airgap/build_bundle.sh</code> and <code>docker load</code> them.</p>
+  <div class="analogy"><span class="tag">Analogy</span>An image is a frozen apartment. A container is a running apartment. Compose is the building plan. Containers share the building's plumbing (the host kernel), which is why they start in seconds and are not virtual machines.</div>
+</section>
+
+<!-- ============ 11 UNIQUE ============ -->
+<section id="unique">
+  <h2><span class="n">11</span>What is unique, and what is not</h2>
+  <div class="grid g3">
+    <div class="card"><h3>1 · Offline parser repair</h3><p>A drifted parser is repaired with sequence alignment (Needleman-Wunsch, from DNA analysis). No LLM, no cloud call.</p></div>
+    <div class="card"><h3>2 · One timeline for two kinds of drift</h3><p>Infrastructure changes and format changes share one store and one provenance model, and are linked by <code>explained_by</code>. Proven by a passing end-to-end test.</p></div>
+    <div class="card"><h3>3 · Air-gapped by construction</h3><p>Zero external URLs in the runtime package. Vendor packs and offline bundles can be Ed25519-signed.</p></div>
+  </div>
+  <p><b>Not our invention, stated up front:</b> format-drift detection (Cisco/Splunk patent), quarantine plus AI-suggested parsers (Databahn), OCSF, Drain3, Isolation Forest, JS divergence.</p>
+
+  <h3>Known limits: say these before a judge finds them</h3>
+  <ul class="tight limits">
+    <li><span class="pill warn">COLLECTOR</span> After 5 failed sends (about 6 seconds of API downtime) it drops that batch. Its own comment says it never drops.</li>
+    <li><span class="pill warn">COLLECTOR</span> <code>transport</code> is empty on batches flushed by the timer. UDP source ids include the sender's port, so a device that changes ports looks like several sources.</li>
+    <li><span class="pill warn">REDIS</span> Persistence is off; a restart loses waiting logs. No takeover of a dead worker's in-flight logs.</li>
+    <li><span class="pill warn">SCALE</span> No CPU or memory limits on containers. No autoscaler. Multi-worker throughput and runs above 100,000 logs are unmeasured.</li>
+    <li><span class="pill warn">SECURITY</span> Static API keys only, no TLS, no rate limit. Signature checking is opt-in (<code>ULI_BUNDLE_REQUIRE_SIGNATURE</code>). Redis port is published on the host.</li>
+    <li><span class="pill warn">DRIFT</span> A successor parser is not proposed automatically when a known parser drifts; it runs on demand.</li>
+  </ul>
+</section>
+
+<!-- ============ 12 FOLDERS ============ -->
+<section id="folders">
+  <h2><span class="n">12</span>Folder map</h2>
+  <div class="grid g2">
+    <div class="card"><h3><code>uli/</code> · the Python engine</h3><p><code>engine.py</code> the 7-tier ladder · <code>pipeline.py</code> the per-log flow and batching · <code>parsers/</code> tiers 1-4 · <code>detection/</code> similarity and unknown clusters · <code>drift/</code> format, infrastructure, correlator, repair · <code>ingestion/queue.py</code> Redis Streams · <code>workers/runner.py</code> the worker loop · <code>api/app.py</code> the API · <code>storage/</code> SQL and raw store · <code>ml/</code> · <code>security/</code> signing</p></div>
+    <div class="card"><h3><code>collector/</code></h3><p>The Go syslog and file collector. One file, <code>cmd/uli-collector/main.go</code>.</p></div>
+    <div class="card"><h3><code>parsers/vendors/</code> · <code>schemas/</code></h3><p>Vendor packs as YAML (pfSense, Squid, Zeek). OCSF and pack schemas.</p></div>
+    <div class="card"><h3><code>scripts/</code></h3><p><code>demo.py</code> · <code>demo_multi_vendor.py</code> · <code>inject.sh</code> · <code>fetch_logs.py</code> (the only script that uses the internet) · <code>sign_bundle.py</code></p></div>
+    <div class="card"><h3><code>deployment/</code></h3><p><code>docker/</code> 4 Dockerfiles · <code>kubernetes/</code> 5 reference manifests · <code>airgap/</code> bundle build and verify · <code>desired-state.yaml</code></p></div>
+    <div class="card"><h3><code>data/</code> · <code>logs/samples/</code></h3><p><code>data/</code> is runtime output: <code>uli.db</code>, <code>raw/</code>, <code>drain/</code>. <code>logs/samples/</code> holds 12 real datasets.</p></div>
+    <div class="card"><h3><code>tests/</code> · <code>docs/</code></h3><p>106 automated tests plus performance benchmarks. <code>docs/</code> holds the honest architecture, scalability, security and roadmap notes.</p></div>
+  </div>
+</section>
+
+<!-- ============ 13 GLOSSARY ============ -->
+<section id="gloss">
+  <h2><span class="n">13</span>Glossary</h2>
+  <dl class="gloss">
+    <dt>Log / event</dt><dd>A log is one raw line. An event is its parsed, graded, stored form. 1 log = 1 event.</dd>
+    <dt>Tier</dt><dd>Which of the 7 ladders produced the result. Lower is more certain.</dd>
+    <dt>Confidence</dt><dd>0 to 1 trust score. Under 0.6 the log keeps falling down the ladder.</dd>
+    <dt>OCSF</dt><dd>Open Cybersecurity Schema Framework: one shared set of field names every parsed log is mapped to.</dd>
+    <dt>Provenance</dt><dd>The paper trail on each event: raw bytes hash, parser and version, tier, confidence.</dd>
+    <dt>Template</dt><dd>A log's fixed skeleton with variable parts replaced by wildcards.</dd>
+    <dt>Drift</dt><dd>Something that used to be stable changed shape: a log format or the machine's setup.</dd>
+    <dt>Consumer group</dt><dd>A set of workers sharing one Redis stream; each entry goes to exactly one member.</dd>
+    <dt>XACK</dt><dd>A worker telling Redis "this entry is finished".</dd>
+    <dt>Air-gapped</dt><dd>Runs with no internet at any point.</dd>
+  </dl>
+</section>
+
+</main>
+
+<footer><div class="wrap">Facts in this guide were checked against the code and measured on the project's own stack. Details and caveats live in <code>docs/architecture.md</code>, <code>docs/scalability.md</code>, <code>docs/security.md</code> and <code>docs/roadmap.md</code>. This page loads nothing from the network.</div></footer>
+
+<script>
+document.querySelectorAll('pre').forEach(function(pre){
+  var b=document.createElement('button');b.className='copy';b.type='button';b.textContent='Copy';
+  b.addEventListener('click',function(){
+    var t=pre.querySelector('code').innerText;
+    try{navigator.clipboard.writeText(t).then(function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1500)},function(){b.textContent='Select + Ctrl+C'})}catch(e){b.textContent='Select + Ctrl+C'}
+  });
+  pre.appendChild(b);
+});
+</script>
+</body>
+</html>

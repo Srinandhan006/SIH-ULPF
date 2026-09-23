@@ -38,15 +38,30 @@ generated `LOAD.sh`, which `docker load`s every image tarball and runs
 or possible offline, since building would require pulling `python:3.12-slim`/`golang:1.22-alpine`
 base layers that are only baked in at bundle-build time on a networked machine.
 
-## 3. Integrity, not authenticity — an honest gap
+## 3. Integrity and authenticity
 
-The bundle is checksummed (SHA-256) so transfer corruption is caught. It is **not currently
-code-signed**. `uli/config.py` has `bundle_pubkey_path` / `bundle_require_signature` fields, and
-`architecture.md` §8 describes "Bundles are Ed25519-signed" as the target design, but no signature
-generation or verification code exists yet in this build — `POST /v1/parsers/bundles`
-(`uli/api/app.py:load_bundle`) accepts a YAML pack and registers it with no signature check. This
-is called out explicitly rather than left to be discovered: **do not present bundle signing as
-implemented.** Tracked in `docs/roadmap.md` and `docs/security.md`.
+The bundle is checksummed (SHA-256, `SHA256SUMS.txt`) so transfer corruption is caught, and it can
+now also be **Ed25519-signed** (`uli/security/signing.py`, `scripts/sign_bundle.py`):
+
+```
+python3 scripts/sign_bundle.py keygen --out-dir deployment/keys
+ULI_AIRGAP_SIGNING_KEY=deployment/keys/bundle_private.pem bash deployment/airgap/build_bundle.sh
+bash deployment/airgap/verify_bundle.sh dist/uli-airgap-<TAG>.tar.gz deployment/keys/bundle_public.pem
+```
+
+`build_bundle.sh` signs the final tarball when `ULI_AIRGAP_SIGNING_KEY` is set (and prints an
+explicit warning, not a silent pass, when it is not); `verify_bundle.sh` is the target-side check —
+checksum first, then signature if a `.sig` and public key are present. The same mechanism covers
+individual vendor parser packs: `POST /v1/parsers/bundles` and `ParserEngine.load_parsers_dir`
+(sibling `<pack>.yaml.sig` files) both verify against `ULI_BUNDLE_PUBKEY_PATH` and honestly record
+`signature_ok` per parser (`uli/storage/sql.py:parsers.signature_ok`) — this used to be hardcoded
+`True` regardless of whether anything was actually checked; see `docs/security.md` §5 for what
+changed and `tests/unit/test_signing.py` / `tests/integration/test_bundle_signing.py` for the
+verification. Setting `ULI_BUNDLE_REQUIRE_SIGNATURE=true` makes an invalid or missing signature a
+hard rejection (`ParserEngine.register_pack` raises) rather than an accepted-but-unverified load.
+
+The private key is never committed to the repo (`deployment/keys/`, `*.pem` are gitignored) —
+operators generate and hold their own per `docs/security.md` §5.
 
 ## 4. What was verified in this build
 
@@ -61,7 +76,10 @@ implemented.** Tracked in `docs/roadmap.md` and `docs/security.md`.
 
 ## 5. Known limitations
 
-- No bundle signing yet (§3).
+- Signing is opt-in (`ULI_AIRGAP_SIGNING_KEY` / `ULI_BUNDLE_REQUIRE_SIGNATURE`), not the default —
+  an operator who doesn't set these still gets a checksummed-only bundle, same as before. The
+  mechanism now exists and is tested; enforcing it everywhere by default is a deployment-config
+  choice, not a missing capability.
 - Kubernetes air-gapped image loading (`ctr`/`crictl import`) is documented (`deployment/kubernetes/README.md`)
   but not scripted — only the Docker Compose `LOAD.sh` path is automated.
 - `logs/samples/` datasets are for **development and demo only**; a production air-gapped

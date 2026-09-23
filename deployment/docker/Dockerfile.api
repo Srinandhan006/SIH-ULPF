@@ -15,6 +15,8 @@ COPY uli ./uli
 COPY schemas ./schemas
 COPY parsers ./parsers
 COPY pyproject.toml README.md ./
+# Include the pre-built React UI so FastAPI can serve it at /ui
+COPY ui/dist ./ui/dist
 RUN mkdir -p /app/data /app/models && chown -R uli:uli /app
 USER uli
 ENV ULI_DATA_DIR=/app/data ULI_PARSERS_DIR=/app/parsers ULI_SCHEMAS_DIR=/app/schemas

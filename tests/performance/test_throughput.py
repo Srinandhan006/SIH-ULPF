@@ -99,3 +99,65 @@ def test_pipeline_throughput_at_scale(stack, n, request):
 
     assert result["events_per_sec"] > 0
     assert result["latency_ms_p99"] < 5000
+
+
+def _run_load_batched(stack, n: int, source_id: str, batch_size: int) -> dict:
+    """Same measurement as _run_load, but through Pipeline.process_batch (docs/scalability.md §2:
+    the fix for the per-event SQL round-trip overhead that _run_load's unbatched path exercises).
+    Per-event latency here is wall time of the batch divided across its events, since individual
+    events no longer commit independently -- that is the point of batching."""
+    proc = psutil.Process(os.getpid())
+    gc.collect()
+    rss_before_mb = proc.memory_info().rss / (1024 * 1024)
+    cpu_times_before = proc.cpu_times()
+
+    batch_latencies_ms: list[float] = []
+    t0 = time.perf_counter()
+    i = 0
+    while i < n:
+        chunk = min(batch_size, n - i)
+        envs = [RawEnvelope.from_bytes(f"{CORPUS[(i + j) % len(CORPUS)]} seq={i + j}".encode(), tenant_id="default", source_id=source_id, transport="http") for j in range(chunk)]
+        e0 = time.perf_counter()
+        stack.pipeline.process_batch(envs)
+        batch_ms = (time.perf_counter() - e0) * 1000.0
+        batch_latencies_ms.extend([batch_ms / chunk] * chunk)  # per-event share of the batch's wall time
+        i += chunk
+    wall_s = time.perf_counter() - t0
+
+    cpu_times_after = proc.cpu_times()
+    rss_after_mb = proc.memory_info().rss / (1024 * 1024)
+    batch_latencies_ms.sort()
+    return {
+        "n": n,
+        "batch_size": batch_size,
+        "wall_seconds": round(wall_s, 4),
+        "events_per_sec": round(n / wall_s, 1),
+        "latency_ms_p50": round(_percentile(batch_latencies_ms, 0.50), 4),
+        "latency_ms_p95": round(_percentile(batch_latencies_ms, 0.95), 4),
+        "latency_ms_p99": round(_percentile(batch_latencies_ms, 0.99), 4),
+        "latency_ms_max": round(batch_latencies_ms[-1], 4),
+        "cpu_user_seconds": round(cpu_times_after.user - cpu_times_before.user, 3),
+        "cpu_system_seconds": round(cpu_times_after.system - cpu_times_before.system, 3),
+        "rss_mb_before": round(rss_before_mb, 1),
+        "rss_mb_after": round(rss_after_mb, 1),
+        "rss_mb_delta": round(rss_after_mb - rss_before_mb, 1),
+    }
+
+
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("n", [1_000, 10_000, 100_000])
+def test_pipeline_throughput_batched_at_scale(stack, n, request):
+    result = _run_load_batched(stack, n, source_id=f"perf-batched:{n}", batch_size=200)
+    result["cpu_count_logical"] = os.cpu_count()
+    print(f"\n[perf-batched] n={n} events/sec={result['events_per_sec']} "
+          f"p50={result['latency_ms_p50']}ms p95={result['latency_ms_p95']}ms p99={result['latency_ms_p99']}ms "
+          f"rss_delta={result['rss_mb_delta']}MB cpu_user={result['cpu_user_seconds']}s")
+
+    existing = {}
+    if RESULTS_PATH.exists():
+        existing = json.loads(RESULTS_PATH.read_text())
+    existing[f"{n}_batched"] = result
+    RESULTS_PATH.write_text(json.dumps(existing, indent=2, sort_keys=True))
+
+    assert result["events_per_sec"] > 0
+    assert result["latency_ms_p99"] < 5000

@@ -43,3 +43,18 @@ def test_health_and_metrics_over_http(api_client):
     r = api_client.get("/metrics")
     assert r.status_code == 200
     assert "python_gc_objects_collected_total" in r.text
+
+
+def test_system_status_and_ui_routes_over_http(api_client):
+    r = api_client.get("/v1/system/status")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "OPERATIONAL"
+    assert data["benchmarks"]["single_worker_baseline_eps"] == 552.5
+    assert len(data["containers"]) == 4
+    assert len(data["ladder"]) == 7
+
+    # Check UI serving route
+    r_ui = api_client.get("/ui")
+    assert r_ui.status_code == 200
+    assert "<!doctype html>" in r_ui.text.lower() or "<html" in r_ui.text.lower()

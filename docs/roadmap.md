@@ -7,9 +7,11 @@ gap is discussed in context — nothing here should be new information, this is 
 
 ## Security
 
-- **Bundle signing** (`docs/security.md` §5, `docs/air-gapped-deployment.md` §3): config fields
-  exist (`bundle_pubkey_path`, `bundle_require_signature`); no Ed25519 signing/verification code is
-  implemented. `POST /v1/parsers/bundles` currently trusts any authenticated caller's YAML.
+- ~~Bundle signing~~ **Implemented**: Ed25519 sign/verify (`uli/security/signing.py`), wired into
+  `POST /v1/parsers/bundles`, `ParserEngine.load_parsers_dir` (sibling `.sig` files), and the
+  air-gap bundle script (`ULI_AIRGAP_SIGNING_KEY`). See `docs/security.md` §5,
+  `docs/air-gapped-deployment.md` §3. Still opt-in (`ULI_BUNDLE_REQUIRE_SIGNATURE` defaults false),
+  which is a deployment-config decision, not a missing capability.
 - Auth beyond static API keys (OAuth/mTLS/SSO) — `docs/security.md` §2.
 - TLS termination and rate limiting are assumed to be handled by a fronting proxy, not built in.
 
@@ -21,21 +23,22 @@ gap is discussed in context — nothing here should be new information, this is 
   SQLite and PostgreSQL are the two implemented SQL backends; ClickHouse is not.
   **Kafka/NATS queue backend**: only Redis Streams and an in-process asyncio queue (`local` mode)
   exist; `architecture.md` §7 names Kafka/NATS as the horizontal-scale alternative.
-- **Per-event SQL round-trip overhead**: profiling during this build (`cProfile` over 2,000
-  `pipeline.process()` calls) showed `write_event`/`index_raw`/`upsert_source`/`record_unknown`
-  issuing roughly 9-10 individual SQL `execute()` calls per event, and SQLAlchemy Core's
-  per-statement machinery (cache-key generation, type coercion) dominating CPU time over the
-  parsing ladder itself. This is consistent with the measured ~210 events/sec single-process
-  throughput (`docs/scalability.md`). Batching per-event writes into fewer statements (or a
-  bulk-insert path for the hot fields) is the highest-leverage next optimization, and was
-  identified but **not implemented** in this build — the honest tradeoff made was to spend the
-  remaining time budget on documentation, deployment verification, and demo completeness rather
-  than a storage-layer rewrite this late in the build. See `docs/scalability.md` §3.
-- **1M/10M-event benchmark runs**: not executed (`tests/performance/test_throughput.py`'s own
-  docstring explains why — at the measured single-process rate this would take on the order of an
-  hour+, outside this benchmark's time budget). The horizontal-scaling story
-  (`architecture.md` §7 — N stateless workers behind Redis Streams, already demonstrated with 2
-  workers in `docker-compose.yml`) is the intended answer to volume, not a faster single process.
+- ~~Per-event SQL round-trip overhead~~ **Fixed**: `Pipeline.process_batch()` +
+  `write_events_bulk`/`index_raw_bulk`/`upsert_sources_bulk` (`uli/storage/sql.py`) collapse the
+  per-event `write_event`/`index_raw`/`upsert_source` calls into per-batch bulk statements, wired
+  into the worker and local multi-line ingest. Measured ~2.6-2.7x throughput (185.6→500.7
+  events/sec at n=1,000; 209.9→552.5 at n=100,000) and ~2.6-2.7x less CPU per event; ratio is
+  consistent across runs, absolute events/sec varies with machine load (`docs/scalability.md` §0-1
+  both show two separate runs). See `docs/scalability.md` §0. `record_unknown` stays per-event
+  (fires only for low-confidence events, not the hot path).
+- **1000-source scale target**: tested (`tests/performance/test_scale_sources.py`) — 5,000 events
+  round-robin across 1,000 distinct source_ids at 494.6 events/sec, with per-source `event_count`
+  verified exactly correct via `upsert_sources_bulk`'s aggregation. See `docs/scalability.md` §4b.
+- **1M/10M-event benchmark runs**: still not executed — with batching, the *projection* (not a
+  measurement) drops from ~94min/~16h to ~30min/~5h for 1M/10M respectively, still outside this
+  session's time budget. The horizontal-scaling story (`architecture.md` §7 — N stateless workers
+  behind Redis Streams, already demonstrated with 2 workers in `docker-compose.yml`) remains the
+  intended answer to volume beyond a single process's now-higher floor.
 
 ## ML
 

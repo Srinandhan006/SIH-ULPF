@@ -173,6 +173,19 @@ H1. **LLM-free parser evolution by semantic label transfer.** When drift is dete
 
 H2. **Cross-domain drift correlation.** Time-join parser-drift events with resource-drift events (image digest, env var, config hash, parser/schema version) within a window, and attach an `explained_by` link when a resource change precedes a parser-confidence drop. We found no system that correlates infrastructure drift with log-format drift. *Validation:* inject an image/config change followed by a format change in the demo; verify the link is produced and no false link is produced for uncorrelated changes.
 
+**Validated**: `tests/integration/test_drift_correlation.py` runs exactly this protocol end-to-end
+through the real pipeline (not the correlator function in isolation) — a resource-drift event
+followed by a genuine parser-drift event (structurally different JSON under the same
+`structural.json` parser) — and asserts the link is produced, plus a negative control (zero-width
+correlation window) asserting no false link. Writing this test surfaced two real bugs that had
+made `explained_by` silently empty in every prior run: `uli/pipeline.py` was calling
+`storage.write_parser_drift()` a second time on an event `DriftMonitor.observe()` had already
+persisted, raising a primary-key `IntegrityError` that the broad `except Exception` around
+correlation swallowed every time; and `uli/drift/correlator.py` compared a timezone-aware
+in-memory datetime against a timezone-naive one read back from SQLite (a known SQLAlchemy/SQLite
+round-trip gotcha), which raised `TypeError` before the fix landed. Both fixed; H2 is now
+implemented, exercised, and passing, not just a validated-on-paper hypothesis.
+
 H3. **Shape-fingerprint routing cache improves throughput without accuracy loss.** Caching `shape_hash → parser_id` should let the hot path skip signature scanning for the overwhelming majority of events (logs are Zipfian in template frequency). *Validation:* benchmark events/sec with cache on/off on Loghub data; report cache hit rate.
 
 H4. **Drift-aware anomaly scoring.** Suppressing anomaly scores during a confirmed parser-drift window (rather than letting drift masquerade as anomalies) reduces false positives. Motivated by the survey finding that all sequence models flag new templates as anomalies. *Validation:* measure anomaly-flag rate during injected drift with and without suppression.

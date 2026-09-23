@@ -18,3 +18,5 @@ dist/
 /collector/uli-collector
 airgap-bundle/
 *.tar.gz.sig
+deployment/keys/
+*.pem

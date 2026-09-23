@@ -58,11 +58,23 @@ echo "[4/5] writing manifest..."
   done
 } > "$STAGE/MANIFEST.txt"
 
-echo "[5/5] archiving..."
+echo "[5/6] archiving..."
 ARCHIVE="$OUT_DIR/uli-airgap-$TAG.tar.gz"
 tar -C "$STAGE" -czf "$ARCHIVE" .
 ( cd "$OUT_DIR" && sha256sum "$(basename "$ARCHIVE")" >> SHA256SUMS.txt )
 
+echo "[6/6] signing..."
+if [ -n "${ULI_AIRGAP_SIGNING_KEY:-}" ] && [ -f "$ULI_AIRGAP_SIGNING_KEY" ]; then
+  python3 "$ROOT/scripts/sign_bundle.py" sign "$ARCHIVE" --key "$ULI_AIRGAP_SIGNING_KEY" --out "$ARCHIVE.sig"
+  echo "signed (Ed25519): $ARCHIVE.sig"
+else
+  echo "WARNING: ULI_AIRGAP_SIGNING_KEY not set — bundle is checksummed (SHA256SUMS.txt) but NOT"
+  echo "  cryptographically signed. This does not satisfy problem-statement.md #7 ('signed offline"
+  echo "  bundle') on its own. To sign:"
+  echo "    python3 scripts/sign_bundle.py keygen --out-dir deployment/keys"
+  echo "    ULI_AIRGAP_SIGNING_KEY=deployment/keys/bundle_private.pem bash deployment/airgap/build_bundle.sh"
+fi
+
 echo "done: $ARCHIVE"
-echo "verify on the target with: sha256sum -c SHA256SUMS.txt"
+echo "verify on the target with: bash deployment/airgap/verify_bundle.sh $(basename "$ARCHIVE") <public-key.pem>"
 echo "deploy on the target with: tar xzf $(basename "$ARCHIVE") -C <dest> && cd <dest> && ./LOAD.sh"

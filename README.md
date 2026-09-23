@@ -91,18 +91,21 @@ storage tradeoff at multi-node scale.
 `deployment/airgap/build_bundle.sh` produces one checksummed tarball containing
 the built Docker images (`docker save`), vendor parser packs, schemas, sample
 datasets, and docs, plus a `LOAD.sh` that `docker load`s everything and brings
-the stack up with no network access. See
+the stack up with no network access. Set `ULI_AIRGAP_SIGNING_KEY` to also
+Ed25519-sign the tarball (`scripts/sign_bundle.py keygen` to generate one); the
+target verifies both with `deployment/airgap/verify_bundle.sh`. See
 [`docs/air-gapped-deployment.md`](docs/air-gapped-deployment.md) for the full
-procedure — including an explicit note that the bundle is integrity-checked
-(SHA-256), **not yet code-signed** (tracked in `docs/security.md` §5 and
-`docs/roadmap.md`). No service in this repo makes an outbound network call at
+procedure and [`docs/security.md`](docs/security.md) §5 for what signing does
+and doesn't cover. No service in this repo makes an outbound network call at
 runtime.
 
 ## 7. Adding a new (known) vendor
 
-Drop a declarative YAML pack into `parsers/vendors/` (or `POST /v1/parsers/bundles`
-with the pack YAML — no signature verification exists yet, see `docs/security.md` §5)
-— no code, no rebuild, no restart. Format and worked
+Drop a declarative YAML pack into `parsers/vendors/` (with an optional sibling
+`<pack>.yaml.sig`) or `POST /v1/parsers/bundles` (with an optional `signature`
+field) — no code, no rebuild, no restart. Signature verification is real
+(`uli/security/signing.py`, Ed25519) but only *enforced* when
+`ULI_BUNDLE_REQUIRE_SIGNATURE=true`; see `docs/security.md` §5. Format and worked
 example: [`docs/parser-design.md`](docs/parser-design.md) §4. Existing examples:
 `parsers/vendors/{pfsense_filterlog,squid_access,zeek_conn}.yaml`.
 

@@ -26,6 +26,7 @@ class PromoteRequest(BaseModel):
 
 class BundleRequest(BaseModel):
     yaml: str
+    signature: str | None = Field(None, description="base64 Ed25519 signature over the yaml field's UTF-8 bytes")
 
 
 class ParserSpecResponse(BaseModel):
